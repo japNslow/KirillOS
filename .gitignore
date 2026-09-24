@@ -1,0 +1,15 @@
+# Compiled object files and binaries
+*.o
+*.bin
+*.img
+*.iso
+*.qcow2
+*.log
+
+# Generated application binaries and headers
+apps/*.o
+apps/*.bin
+apps/*_data.h
+
+# ISO staging directory artifact
+iso/boot/kirillos.bin
