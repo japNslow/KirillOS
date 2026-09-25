@@ -53,6 +53,7 @@
 #define KEY_DEL        ((char)0x89)
 
 void    keyboard_init(void);
+void    keyboard_check_hardware(void);
 char    keyboard_getchar(void);       /* blocking read */
 int     keyboard_has_char(void);
 char    keyboard_poll(void);          /* 0 if empty */

@@ -22,6 +22,8 @@ int mouse_btn_middle = 0;
 
 static uint8_t mouse_cycle = 0;
 static uint8_t mouse_packet[3];
+static int mouse_enabled = 0;
+static int mouse_has_updated = 0;
 
 /* ================================================================ */
 /*                     Port I/O Helpers                             */
@@ -77,6 +79,7 @@ int mouse_init(void) {
     mouse_btn_right = 0;
     mouse_btn_middle = 0;
     mouse_cycle = 0;
+    mouse_has_updated = 0;
 
     // Drain any leftover bytes in controller data buffer
     for (int i = 0; i < 32; i++) {
@@ -122,81 +125,101 @@ int mouse_init(void) {
         }
     }
 
+    mouse_enabled = 1;
     return 1;
 }
 
-int mouse_poll(void) {
-    int updated = 0;
+void mouse_disable(void) {
+    if (!mouse_enabled) return;
 
-    while (inb(KBD_STATUS_PORT) & 0x01) {
-        uint8_t status = inb(KBD_STATUS_PORT);
-        uint8_t data = inb(KBD_DATA_PORT);
+    // Disable Data Reporting on device (0xF5)
+    mouse_write_device(0xF5);
 
-        // Bit 5: 1 = auxiliary device (mouse), 0 = keyboard
-        if (!(status & 0x20)) {
-            // Forward keyboard scancode to keyboard driver so typing remains intact
-            keyboard_handle_scancode(data);
-            continue;
-        }
+    // Disable auxiliary device on 8042 controller (0xA7)
+    mouse_wait_write();
+    outb(KBD_CMD_PORT, 0xA7);
 
-        switch (mouse_cycle) {
-            case 0:
-                // Bit 3 of byte 0 MUST be 1 in standard PS/2 mouse packet header
-                if (!(data & 0x08)) {
-                    break;
-                }
-                mouse_packet[0] = data;
-                mouse_cycle = 1;
-                break;
-
-            case 1:
-                mouse_packet[1] = data;
-                mouse_cycle = 2;
-                break;
-
-            case 2:
-                mouse_packet[2] = data;
-                mouse_cycle = 0;
-
-                uint8_t flags = mouse_packet[0];
-
-                // Buttons
-                mouse_btn_left   = (flags & 0x01) ? 1 : 0;
-                mouse_btn_right  = (flags & 0x02) ? 1 : 0;
-                mouse_btn_middle = (flags & 0x04) ? 1 : 0;
-
-                // X movement: bit 4 is sign bit
-                int dx = (int)mouse_packet[1];
-                if (flags & 0x10) {
-                    dx -= 256;
-                }
-
-                // Y movement: bit 5 is sign bit
-                int dy = (int)mouse_packet[2];
-                if (flags & 0x20) {
-                    dy -= 256;
-                }
-
-                // Discard movement on overflow
-                if (flags & 0x40) dx = 0;
-                if (flags & 0x80) dy = 0;
-
-                // Update position (in PS/2 positive dy is UP, on screen Y increases DOWN)
-                mouse_x += dx;
-                mouse_y -= dy;
-
-                // Clamp to screen boundaries (320x200 Mode 13h)
-                if (mouse_x < 0) mouse_x = 0;
-                if (mouse_x >= MODE13_WIDTH) mouse_x = MODE13_WIDTH - 1;
-                if (mouse_y < 0) mouse_y = 0;
-                if (mouse_y >= MODE13_HEIGHT) mouse_y = MODE13_HEIGHT - 1;
-
-                updated = 1;
-                break;
+    // Drain leftover bytes
+    for (int i = 0; i < 32; i++) {
+        if (inb(KBD_STATUS_PORT) & 0x01) {
+            (void)inb(KBD_DATA_PORT);
+        } else {
+            break;
         }
     }
 
-    return updated;
+    mouse_cycle = 0;
+    mouse_btn_left = 0;
+    mouse_btn_right = 0;
+    mouse_btn_middle = 0;
+    mouse_has_updated = 0;
+    mouse_enabled = 0;
+}
+
+void mouse_handle_byte(uint8_t data) {
+    if (!mouse_enabled) return;
+
+    switch (mouse_cycle) {
+        case 0:
+            // Bit 3 of byte 0 MUST be 1 in standard PS/2 mouse packet header
+            if (!(data & 0x08)) {
+                return;
+            }
+            mouse_packet[0] = data;
+            mouse_cycle = 1;
+            break;
+
+        case 1:
+            mouse_packet[1] = data;
+            mouse_cycle = 2;
+            break;
+
+        case 2:
+            mouse_packet[2] = data;
+            mouse_cycle = 0;
+
+            uint8_t flags = mouse_packet[0];
+
+            // Buttons
+            mouse_btn_left   = (flags & 0x01) ? 1 : 0;
+            mouse_btn_right  = (flags & 0x02) ? 1 : 0;
+            mouse_btn_middle = (flags & 0x04) ? 1 : 0;
+
+            // X movement: bit 4 is sign bit
+            int dx = (int)mouse_packet[1];
+            if (flags & 0x10) {
+                dx -= 256;
+            }
+
+            // Y movement: bit 5 is sign bit
+            int dy = (int)mouse_packet[2];
+            if (flags & 0x20) {
+                dy -= 256;
+            }
+
+            // Discard movement on overflow
+            if (flags & 0x40) dx = 0;
+            if (flags & 0x80) dy = 0;
+
+            // Update position (in PS/2 positive dy is UP, on screen Y increases DOWN)
+            mouse_x += dx;
+            mouse_y -= dy;
+
+            // Clamp to screen boundaries (320x200 Mode 13h)
+            if (mouse_x < 0) mouse_x = 0;
+            if (mouse_x >= MODE13_WIDTH) mouse_x = MODE13_WIDTH - 1;
+            if (mouse_y < 0) mouse_y = 0;
+            if (mouse_y >= MODE13_HEIGHT) mouse_y = MODE13_HEIGHT - 1;
+
+            mouse_has_updated = 1;
+            break;
+    }
+}
+
+int mouse_poll(void) {
+    mouse_has_updated = 0;
+    keyboard_check_hardware();
+    return mouse_has_updated;
 }
 
 /* ================================================================ */

@@ -555,9 +555,11 @@ static void execute_action(int action_id, int file_idx) {
             if (!filename) return;
             sound_soft_note(880, 40);
             mouse_hide_cursor();
+            mouse_disable();
             mode13_exit();
             kano_open(filename);
             mode13_enter();
+            mouse_init();
             draw_full_gui();
             mouse_draw_cursor();
             break;
@@ -566,9 +568,11 @@ static void execute_action(int action_id, int file_idx) {
             if (!filename) return;
             sound_soft_note(880, 40);
             mouse_hide_cursor();
+            mouse_disable();
             mode13_exit();
             kdhe_open(filename);
             mode13_enter();
+            mouse_init();
             draw_full_gui();
             mouse_draw_cursor();
             break;
@@ -577,6 +581,7 @@ static void execute_action(int action_id, int file_idx) {
             if (!filename) return;
             sound_soft_note(659, 50);
             mouse_hide_cursor();
+            mouse_disable();
             mode13_exit();
             if (str_ends_with(filename, ".kmidi")) {
                 kmidi_open(filename);
@@ -591,6 +596,7 @@ static void execute_action(int action_id, int file_idx) {
                 keyboard_getchar();
             }
             mode13_enter();
+            mouse_init();
             draw_full_gui();
             mouse_draw_cursor();
             break;
@@ -599,6 +605,7 @@ static void execute_action(int action_id, int file_idx) {
             if (!filename) return;
             sound_soft_note(784, 50);
             mouse_hide_cursor();
+            mouse_disable();
             mode13_exit();
 
             file_type_t ft = get_file_type(filename);
@@ -629,6 +636,7 @@ static void execute_action(int action_id, int file_idx) {
             }
 
             mode13_enter();
+            mouse_init();
             draw_full_gui();
             mouse_draw_cursor();
             break;
@@ -889,6 +897,7 @@ void kcommander_start(void) {
     /* Clean Shutdown: Hide mouse and restore VGA 80x25 text mode   */
     /* ------------------------------------------------------------ */
     mouse_hide_cursor();
+    mouse_disable();
     mode13_exit();
     vga_clear();
 }

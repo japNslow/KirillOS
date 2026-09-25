@@ -1,4 +1,5 @@
 #include "keyboard.h"
+#include "mouse.h"
 #include <stdint.h>
 
 #define KB_DATA   0x60
@@ -92,10 +93,16 @@ void keyboard_init(void) {
     while (inb(KB_STATUS) & 0x02);
 }
 
-static void keyboard_check_hardware(void) {
-    while (inb(KB_STATUS) & 0x01) {
-        uint8_t sc = inb(KB_DATA);
-        keyboard_handle_scancode(sc);
+void keyboard_check_hardware(void) {
+    while (1) {
+        uint8_t status = inb(KB_STATUS);
+        if (!(status & 0x01)) break;
+        uint8_t data = inb(KB_DATA);
+        if (status & 0x20) {
+            mouse_handle_byte(data);
+        } else {
+            keyboard_handle_scancode(data);
+        }
     }
 }
 

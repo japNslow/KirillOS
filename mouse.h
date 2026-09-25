@@ -30,6 +30,17 @@ extern int mouse_btn_middle;
 int mouse_init(void);
 
 /**
+ * Disables PS/2 mouse stream reporting (0xF5) and auxiliary port clock (0xA7).
+ * Flushes buffer and resets packet cycle.
+ */
+void mouse_disable(void);
+
+/**
+ * Feeds a single byte from the 8042 auxiliary port into the mouse packet state machine.
+ */
+void mouse_handle_byte(uint8_t data);
+
+/**
  * Non-blocking poll for incoming PS/2 data packets.
  * Forwards keyboard data to keyboard driver.
  * Updates mouse_x, mouse_y, and button states upon full 3-byte packet.

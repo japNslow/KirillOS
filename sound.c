@@ -26,7 +26,7 @@ static uint16_t pit0_count(void) {
     return count;
 }
 
-extern void keyboard_handle_scancode(uint8_t sc);
+#include "keyboard.h"
 
 static void delay(uint32_t milliseconds) {
     while (milliseconds--) {
@@ -38,9 +38,7 @@ static void delay(uint32_t milliseconds) {
             if (current > previous) break;
         } while (--timeout);
 
-        while (inb(0x64) & 0x01) {
-            keyboard_handle_scancode(inb(0x60));
-        }
+        keyboard_check_hardware();
     }
 }
 
