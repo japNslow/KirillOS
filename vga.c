@@ -69,7 +69,18 @@ void vga_write_hex(uint32_t value, int digits) {
         vga_putchar(hex[(value >> (i * 4)) & 0xF]);
 }
 
+static inline void outb(uint16_t port, uint8_t val) {
+    __asm__ volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
+}
+
 void vga_set_cursor(size_t r, size_t c) {
+    if (r >= VGA_HEIGHT) r = VGA_HEIGHT - 1;
+    if (c >= VGA_WIDTH) c = VGA_WIDTH - 1;
     row = r;
     col = c;
+    uint16_t pos = (uint16_t)(row * VGA_WIDTH + col);
+    outb(0x3D4, 0x0F);
+    outb(0x3D5, (uint8_t)(pos & 0xFF));
+    outb(0x3D4, 0x0E);
+    outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
 }

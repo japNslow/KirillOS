@@ -35,21 +35,22 @@ entry:
     mov word [dap_offset], 0x0000
     call read_sectors
 
-    ; Загрузка kernel.bin (136 секторов = 68 КБ, LBA 65) в 0x2000:0x0000 (физ. 0x20000)
-    ; Читаем двумя блоками по 68 секторов для надежности BIOS INT 13h
+    ; Загрузка kernel.bin (256 секторов = 128 КБ, LBA 65..320) в 0x2000:0x0000 (физ. 0x20000)
+    ; Читаем 4 блоками по 64 сектора для совместимости с BIOS INT 13h
+    mov cx, 4
     mov dword [dap_lba_low], 65
-    mov dword [dap_lba_high], 0
-    mov word [dap_count], 68
     mov word [dap_segment], 0x2000
-    mov word [dap_offset], 0x0000
-    call read_sectors
-
-    mov dword [dap_lba_low], 133
+.load_kernel_loop:
+    push cx
     mov dword [dap_lba_high], 0
-    mov word [dap_count], 68
-    mov word [dap_segment], 0x2880
+    mov word [dap_count], 64
     mov word [dap_offset], 0x0000
     call read_sectors
+    add dword [dap_lba_low], 64
+    add word [dap_segment], 0x0800
+    pop cx
+    loop .load_kernel_loop
+
 
     mov si, msg_pmode
     call puts16

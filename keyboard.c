@@ -52,6 +52,8 @@ void keyboard_handle_scancode(uint8_t sc) {
         if (!extended) {
             if (rel == 0x2A || rel == 0x36) shift = 0;
             if (rel == 0x1D) control = 0;
+        } else {
+            if (rel == 0x1D) control = 0; /* Right Ctrl */
         }
         extended = 0;
         return;
@@ -59,6 +61,7 @@ void keyboard_handle_scancode(uint8_t sc) {
 
     if (extended) {
         extended = 0;
+        if (sc == 0x1D) { control = 1; return; } /* Right Ctrl */
         if (sc == 0x48) { push_char(KEY_UP); return; }
         if (sc == 0x50) { push_char(KEY_DOWN); return; }
         if (sc == 0x4B) { push_char(KEY_LEFT); return; }
@@ -77,9 +80,11 @@ void keyboard_handle_scancode(uint8_t sc) {
     if (sc == 0x01) { push_char(KEY_ESC); return; }
 
     char c = shift ? kbd_us_shift[sc] : kbd_us[sc];
-    if (control && (c == 's' || c == 'S')) c = KEY_SAVE;
-    if (control && (c == 'q' || c == 'Q')) c = KEY_QUIT;
-    if (control && (c == 'p' || c == 'P')) c = KEY_PLAY;
+    if (control) {
+        if (c >= 'a' && c <= 'z') c = (char)(c - 'a' + 1);
+        else if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 1);
+        else if (c == '\\' || c == '|') c = 28; /* Ctrl+\ (FS) */
+    }
     if (c) push_char(c);
 }
 

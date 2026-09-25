@@ -49,7 +49,7 @@ def main():
         # 3. Запись ядра (kernel.bin)
         with open(KERNEL_FILE, "rb") as f:
             kernel_data = f.read()
-            max_kernel = (201 - 65) * SECTOR_SIZE  # 136 секторов = 69632 байта (~68 КБ)
+            max_kernel = (321 - 65) * SECTOR_SIZE  # 256 секторов = 131072 байта (128 КБ)
             if len(kernel_data) > max_kernel:
                 print(f"[ERROR] kernel.bin is {len(kernel_data)} bytes, exceeds {max_kernel} limit!")
                 sys.exit(1)
@@ -58,7 +58,8 @@ def main():
             pad_kernel = max_kernel - len(kernel_data)
             if pad_kernel > 0:
                 img.write(b"\x00" * pad_kernel)
-            print(f"[OK] Wrote kernel ({len(kernel_data)} bytes) to LBA 65..200")
+            print(f"[OK] Wrote kernel ({len(kernel_data)} bytes) to LBA 65..320")
+
 
     print("[SUCCESS] Disk image 'kirillos.img' assembled.")
 
