@@ -9,6 +9,9 @@
 #include "kmidi.h"
 #include "khex.h"
 #include "khexd.h"
+#include "kfetch.h"
+#include "mode13.h"
+
 
 #define INPUT_MAX 128
 
@@ -389,15 +392,31 @@ static void handle_command(char* cmd) {
         vga_write("  beep         - play an 8-bit beep\n");
         vga_write("  tone F M     - play frequency F for M ms\n");
         vga_write("  music        - play KirillOS chiptune demo\n");
+        vga_write("  kfetch       - display system info & VGA color palette\n");
+        vga_write("  date / time  - display CMOS RTC real-time clock\n");
+        vga_write("  mode13       - launch 320x200 256-color VGA Mode 13h demo\n");
     }
     else if (strcmp_(cmd, "about") == 0) {
         vga_write("KirillOS v0.2 - minimal x86 OS\n");
-        vga_write("kboot + KHEX Runner + Kdhe Hex Editor + Kmidi Tracker + AC97 + KFS\n");
+        vga_write("kboot + KHEX Runner + Kdhe Hex Editor + Kmidi Tracker + Mode 13h + KFS\n");
+    }
+    else if (strcmp_(cmd, "kfetch") == 0 || strcmp_(cmd, "fetch") == 0) {
+        kfetch_print();
+    }
+    else if (strcmp_(cmd, "date") == 0) {
+        kfetch_date();
+    }
+    else if (strcmp_(cmd, "time") == 0) {
+        kfetch_time();
+    }
+    else if (strcmp_(cmd, "mode13") == 0 || strcmp_(cmd, "demo13") == 0) {
+        mode13_demo();
     }
     else if (strcmp_(cmd, "clear") == 0) {
         vga_clear();
     }
     else if (command_is(cmd, "run")) {
+
         char* name = next_word(cmd + 3);
         if (!name) vga_write("Usage: run PROGRAM.BIN\n");
         else khex_run_file(name);

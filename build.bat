@@ -102,9 +102,14 @@ if errorlevel 1 goto :error
 if errorlevel 1 goto :error
 "%GCC%" -m32 -c khexd.c    -o khexd.o    -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -O2
 if errorlevel 1 goto :error
+"%GCC%" -m32 -c kfetch.c   -o kfetch.o   -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -O2
+if errorlevel 1 goto :error
+"%GCC%" -m32 -c mode13.c   -o mode13.o   -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -O2
+if errorlevel 1 goto :error
 
 echo [4/5] Linking KirillOS kernel...
-"%LD%" -m elf_i386 -T linker.ld -o %OUT% boot.o kernel.o keyboard.o vga.o kirillfs.o kmemory.o ata.o sound.o ac97.o kano.o kdhe.o kmidi.o khex.o khexd.o
+"%LD%" -m elf_i386 -T linker.ld -o %OUT% boot.o kernel.o keyboard.o vga.o kirillfs.o kmemory.o ata.o sound.o ac97.o kano.o kdhe.o kmidi.o khex.o khexd.o kfetch.o mode13.o
+
 if errorlevel 1 goto :error
 
 echo [5/5] Assembling bootable disk image %DISK_IMG%...
