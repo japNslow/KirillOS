@@ -11,6 +11,8 @@
 #include "khexd.h"
 #include "kfetch.h"
 #include "mode13.h"
+#include "mouse.h"
+#include "kcommander.h"
 
 
 #define INPUT_MAX 128
@@ -395,6 +397,7 @@ static void handle_command(char* cmd) {
         vga_write("  kfetch       - display system info & VGA color palette\n");
         vga_write("  date / time  - display CMOS RTC real-time clock\n");
         vga_write("  mode13       - launch 320x200 256-color VGA Mode 13h demo\n");
+        vga_write("  kcommander   - graphical Norton/Total Commander in Mode 13h (alias: kc)\n");
     }
     else if (strcmp_(cmd, "about") == 0) {
         vga_write("KirillOS v0.2 - minimal x86 OS\n");
@@ -411,6 +414,9 @@ static void handle_command(char* cmd) {
     }
     else if (strcmp_(cmd, "mode13") == 0 || strcmp_(cmd, "demo13") == 0) {
         mode13_demo();
+    }
+    else if (strcmp_(cmd, "kcommander") == 0 || strcmp_(cmd, "kc") == 0 || strcmp_(cmd, "commander") == 0) {
+        kcommander_start();
     }
     else if (strcmp_(cmd, "clear") == 0) {
         vga_clear();
