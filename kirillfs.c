@@ -2,7 +2,7 @@
 #include "ata.h"
 #include <stdint.h>
 
-#define KFS_MAGIC 0x4B465331
+#define KFS_MAGIC 0x4B465332
 #define KFS_FIRST_SECTOR 321
 
 #define KFS_HEADER_SIZE 4
@@ -31,53 +31,49 @@ static uint32_t get32(const uint8_t* p) {
 }
 
 static void save(void) {
-    int offset = 0;
     if (!persistent) return;
-    for (int s = 0; s < KFS_SECTOR_COUNT; s++) {
+
+    // Sector 0: magic (4 bytes) + first 508 bytes of files array
+    for (int i = 0; i < 512; i++) sector[i] = 0;
+    put32(sector, KFS_MAGIC);
+    const uint8_t* src = (const uint8_t*)files;
+    int total_bytes = (int)sizeof(files);
+    int chunk = (total_bytes > 508) ? 508 : total_bytes;
+    for (int i = 0; i < chunk; i++) sector[4 + i] = src[i];
+    (void)ata_write28(KFS_FIRST_SECTOR, sector);
+
+    // Remaining sectors:
+    int offset = 508;
+    int s = 1;
+    while (offset < total_bytes && s < (int)KFS_SECTOR_COUNT) {
         for (int i = 0; i < 512; i++) sector[i] = 0;
-        if (s == 0) put32(sector, KFS_MAGIC);
-        for (int f = 0; f < KFS_MAX_FILES; f++) {
-            int base = KFS_HEADER_SIZE + f * KFS_RECORD_SIZE;
-            for (int i = 0; i < 4; i++) {
-                if (base + i >= s * 512 && base + i < (s + 1) * 512)
-                    sector[base + i - s * 512] = (uint8_t)files[f].used;
-            }
-            offset = base + 4;
-            for (int i = 0; i < 4; i++)
-                if (offset + i >= s * 512 && offset + i < (s + 1) * 512)
-                    sector[offset + i - s * 512] = (uint8_t)(files[f].size >> (i * 8));
-            for (int i = 0; i < KFS_NAME_MAX + KFS_DATA_MAX; i++) {
-                int pos = base + 8 + i;
-                char value = i < KFS_NAME_MAX ? files[f].name[i] : files[f].data[i - KFS_NAME_MAX];
-                if (pos >= s * 512 && pos < (s + 1) * 512)
-                    sector[pos - s * 512] = (uint8_t)value;
-            }
-        }
+        int rem = total_bytes - offset;
+        int cur_chunk = (rem > 512) ? 512 : rem;
+        for (int i = 0; i < cur_chunk; i++) sector[i] = src[offset + i];
         (void)ata_write28(KFS_FIRST_SECTOR + s, sector);
+        offset += cur_chunk;
+        s++;
     }
 }
 
 static int load(void) {
     if (!persistent || !ata_read28(KFS_FIRST_SECTOR, sector) ||
         get32(sector) != KFS_MAGIC) return 0;
-    for (int s = 0; s < KFS_SECTOR_COUNT; s++) {
+
+    uint8_t* dst = (uint8_t*)files;
+    int total_bytes = (int)sizeof(files);
+    int chunk = (total_bytes > 508) ? 508 : total_bytes;
+    for (int i = 0; i < chunk; i++) dst[i] = sector[4 + i];
+
+    int offset = 508;
+    int s = 1;
+    while (offset < total_bytes && s < (int)KFS_SECTOR_COUNT) {
         if (!ata_read28(KFS_FIRST_SECTOR + s, sector)) return 0;
-        for (int f = 0; f < KFS_MAX_FILES; f++) {
-            int base = KFS_HEADER_SIZE + f * KFS_RECORD_SIZE;
-            int pos = base;
-            if (pos >= s * 512 && pos + 3 < (s + 1) * 512)
-                files[f].used = sector[pos - s * 512];
-            pos = base + 4;
-            if (pos >= s * 512 && pos + 3 < (s + 1) * 512)
-                files[f].size = get32(sector + pos - s * 512);
-            for (int i = 0; i < KFS_NAME_MAX + KFS_DATA_MAX; i++) {
-                pos = base + 8 + i;
-                if (pos >= s * 512 && pos < (s + 1) * 512) {
-                    if (i < KFS_NAME_MAX) files[f].name[i] = sector[pos - s * 512];
-                    else files[f].data[i - KFS_NAME_MAX] = sector[pos - s * 512];
-                }
-            }
-        }
+        int rem = total_bytes - offset;
+        int cur_chunk = (rem > 512) ? 512 : rem;
+        for (int i = 0; i < cur_chunk; i++) dst[offset + i] = sector[i];
+        offset += cur_chunk;
+        s++;
     }
     return 1;
 }

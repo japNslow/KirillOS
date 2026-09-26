@@ -9,6 +9,7 @@
 #include "kmidi.h"
 #include "khex.h"
 #include "khexd.h"
+#include "kaint.h"
 #include "sound.h"
 #include <stdint.h>
 #include <stddef.h>
@@ -106,6 +107,7 @@ typedef enum {
     FTYPE_MIDI,       /* .kmidi */
     FTYPE_CODE,       /* .k */
     FTYPE_OBJ,        /* .ko */
+    FTYPE_BMP,        /* .bmp */
     FTYPE_TXT         /* .txt and others */
 } file_type_t;
 
@@ -135,6 +137,7 @@ static file_type_t get_file_type(const char* name) {
     if (str_ends_with(name, ".kmidi"))return FTYPE_MIDI;
     if (str_ends_with(name, ".k"))    return FTYPE_CODE;
     if (str_ends_with(name, ".ko"))   return FTYPE_OBJ;
+    if (str_ends_with(name, ".bmp"))  return FTYPE_BMP;
     return FTYPE_TXT;
 }
 
@@ -145,6 +148,7 @@ static const char* get_type_badge(file_type_t t) {
         case FTYPE_MIDI: return "[MID]";
         case FTYPE_CODE: return "[K  ]";
         case FTYPE_OBJ:  return "[OBJ]";
+        case FTYPE_BMP:  return "[BMP]";
         default:         return "[TXT]";
     }
 }
@@ -156,6 +160,7 @@ static uint8_t get_type_color(file_type_t t) {
         case FTYPE_MIDI: return COLOR_LIGHT_MAGENTA;
         case FTYPE_CODE: return COLOR_YELLOW;
         case FTYPE_OBJ:  return COLOR_LIGHT_GREY;
+        case FTYPE_BMP:  return COLOR_LIGHT_RED;
         default:         return COLOR_WHITE;
     }
 }
@@ -631,6 +636,8 @@ static void execute_action(int action_id, int file_idx) {
                 kmidi_play_file(filename);
                 vga_write("\nPress any key to return to Commander...");
                 keyboard_getchar();
+            } else if (ft == FTYPE_BMP) {
+                kaint_start(filename);
             } else {
                 kano_open(filename);
             }

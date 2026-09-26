@@ -13,6 +13,7 @@
 #include "mode13.h"
 #include "mouse.h"
 #include "kcommander.h"
+#include "kaint.h"
 
 
 #define INPUT_MAX 128
@@ -398,10 +399,11 @@ static void handle_command(char* cmd) {
         vga_write("  date / time  - display CMOS RTC real-time clock\n");
         vga_write("  mode13       - launch 320x200 256-color VGA Mode 13h demo\n");
         vga_write("  kcommander   - graphical Norton/Total Commander in Mode 13h (alias: kc)\n");
+        vga_write("  kaint [file] - graphical paint program with mouse & BMP export\n");
     }
     else if (strcmp_(cmd, "about") == 0) {
         vga_write("KirillOS v0.2 - minimal x86 OS\n");
-        vga_write("kboot + KHEX Runner + Kdhe Hex Editor + Kmidi Tracker + Mode 13h + KFS\n");
+        vga_write("kboot + KHEX Runner + Kdhe Hex Editor + Kmidi Tracker + Mode 13h + KFS + Kaint\n");
     }
     else if (strcmp_(cmd, "kfetch") == 0 || strcmp_(cmd, "fetch") == 0) {
         kfetch_print();
@@ -417,6 +419,13 @@ static void handle_command(char* cmd) {
     }
     else if (strcmp_(cmd, "kcommander") == 0 || strcmp_(cmd, "kc") == 0 || strcmp_(cmd, "commander") == 0) {
         kcommander_start();
+    }
+    else if (strcmp_(cmd, "kaint") == 0 || strcmp_(cmd, "paint") == 0) {
+        kaint_start(0);
+    }
+    else if (command_is(cmd, "kaint") || command_is(cmd, "paint")) {
+        char* file = next_word(cmd + (command_is(cmd, "kaint") ? 5 : 5));
+        kaint_start(file);
     }
     else if (strcmp_(cmd, "clear") == 0) {
         vga_clear();
@@ -643,6 +652,9 @@ void kernel_main(uint32_t magic, uint32_t mbi) {
     /* Initialize KHEX binary runner and preload games (snake, guess, matrix) */
     khex_init();
     khex_init_default_apps();
+
+    /* Preload default demo.bmp for Kaint and Mode 13h */
+    kaint_init_default_bmp();
 
     /* ---- Banner ---- */
     vga_set_color(VGA_LIGHT_CYAN, VGA_BLACK);

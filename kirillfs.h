@@ -1,9 +1,9 @@
 #ifndef KIRILLFS_H
 #define KIRILLFS_H
 
-#define KFS_MAX_FILES 32
+#define KFS_MAX_FILES 16
 #define KFS_NAME_MAX  24
-#define KFS_DATA_MAX  2048
+#define KFS_DATA_MAX  49152  /* 48 KB per file, supports full BMP images up to 256x160 */
 
 typedef enum {
     KFS_OK = 0,
