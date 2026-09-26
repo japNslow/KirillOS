@@ -53,11 +53,13 @@ static const uint8_t mode03_ac[21] = {
     0x0C, 0x00, 0x0F, 0x08, 0x00
 };
 
-/* Plane 2 Font Backup (4096 bytes for 256 characters of 16 bytes each) */
-static uint8_t font_backup[4096];
+/* Plane 2 Font Backup (8192 bytes for 256 characters of 32 bytes each) */
+static uint8_t font_backup[8192];
 static int     font_saved = 0;
 
 static void save_font(void) {
+    if (font_saved) return; /* Never overwrite font once saved from clean text mode */
+
     outb(0x3C4, 0x00); outb(0x3C5, 0x01);
     outb(0x3C4, 0x02); outb(0x3C5, 0x04);
     outb(0x3C4, 0x04); outb(0x3C5, 0x06);
@@ -68,10 +70,24 @@ static void save_font(void) {
     outb(0x3CE, 0x06); outb(0x3CF, 0x04);
 
     volatile uint8_t* src = (volatile uint8_t*)0xA0000;
-    for (int i = 0; i < 4096; i++) {
+    for (int i = 0; i < 8192; i++) {
         font_backup[i] = src[i];
     }
     font_saved = 1;
+}
+
+void mode13_init(void) {
+    if (!font_saved) {
+        save_font();
+        for (uint8_t i = 1; i < 5; i++) {
+            outb(0x3C4, i);
+            outb(0x3C5, mode03_seq[i]);
+        }
+        for (uint8_t i = 0; i < 9; i++) {
+            outb(0x3CE, i);
+            outb(0x3CF, mode03_gc[i]);
+        }
+    }
 }
 
 static void restore_font(void) {
@@ -86,8 +102,13 @@ static void restore_font(void) {
     outb(0x3CE, 0x06); outb(0x3CF, 0x04);
 
     volatile uint8_t* dst = (volatile uint8_t*)0xA0000;
-    for (int i = 0; i < 4096; i++) {
+    for (int i = 0; i < 8192; i++) {
         dst[i] = font_backup[i];
+    }
+
+    /* ASCII 32 (Space) must ALWAYS be 100% blank (32 bytes at offset 1024) */
+    for (int i = 0; i < 32; i++) {
+        dst[1024 + i] = 0x00;
     }
 }
 
@@ -223,8 +244,20 @@ void mode13_exit(void) {
     (void)inb(0x3DA);
     outb(0x3C0, 0x20);
 
+    /* Restore standard 16 text mode DAC colors */
+    static const uint8_t text16[16][3] = {
+        {0, 0, 0},    {0, 0, 42},   {0, 42, 0},   {0, 42, 42},
+        {42, 0, 0},   {42, 0, 42},  {42, 21, 0},  {42, 42, 42},
+        {21, 21, 21}, {21, 21, 63}, {21, 63, 21}, {21, 63, 63},
+        {63, 21, 21}, {63, 21, 63}, {63, 63, 21}, {63, 63, 63}
+    };
+    for (uint8_t i = 0; i < 16; i++) {
+        mode13_set_palette(i, text16[i][0], text16[i][1], text16[i][2]);
+    }
+
     vga_init();
     vga_clear();
+    vga_set_cursor(0, 0);
 }
 
 /* ================================================================ */

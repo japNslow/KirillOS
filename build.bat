@@ -108,13 +108,19 @@ if errorlevel 1 goto :error
 if errorlevel 1 goto :error
 "%GCC%" -m32 -c mouse.c    -o mouse.o    -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -O2
 if errorlevel 1 goto :error
-"%GCC%" -m32 -c kcommander.c -o kcommander.o -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -O2
+"%GCC%" -m32 -c kcommander.c -o kcommander.o -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -Os
 if errorlevel 1 goto :error
-"%GCC%" -m32 -c kaint.c -o kaint.o -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -O2
+"%GCC%" -m32 -c kaint.c -o kaint.o -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -Os
+if errorlevel 1 goto :error
+"%GCC%" -m32 -c kguiq.c -o kguiq.o -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -Os
+if errorlevel 1 goto :error
+"%GCC%" -m32 -c kguid.c -o kguid.o -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -Os
+if errorlevel 1 goto :error
+"%GCC%" -m32 -c kgui.c -o kgui.o -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -Os
 if errorlevel 1 goto :error
 
 echo [4/5] Linking KirillOS kernel...
-"%LD%" -m elf_i386 -T linker.ld -o %OUT% boot.o kernel.o keyboard.o vga.o kirillfs.o kmemory.o ata.o sound.o ac97.o kano.o kdhe.o kmidi.o khex.o khexd.o kfetch.o mode13.o mouse.o kcommander.o kaint.o
+"%LD%" -m elf_i386 -T linker.ld -o %OUT% boot.o kernel.o keyboard.o vga.o kirillfs.o kmemory.o ata.o sound.o ac97.o kano.o kdhe.o kmidi.o khex.o khexd.o kfetch.o mode13.o mouse.o kcommander.o kaint.o kguiq.o kguid.o kgui.o
 
 if errorlevel 1 goto :error
 

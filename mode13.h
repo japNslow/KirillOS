@@ -8,6 +8,7 @@
 #define MODE13_HEIGHT 200
 #define MODE13_VRAM   ((uint8_t*)0xA0000)
 
+void mode13_init(void);
 void mode13_enter(void);
 void mode13_exit(void);
 

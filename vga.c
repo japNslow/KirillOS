@@ -12,6 +12,16 @@ static inline uint16_t make_entry(char c, uint8_t col) {
     return (uint16_t)c | ((uint16_t)col << 8);
 }
 
+static vga_output_hook_t output_hook = 0;
+
+void vga_set_output_hook(vga_output_hook_t hook) {
+    output_hook = hook;
+}
+
+vga_output_hook_t vga_get_output_hook(void) {
+    return output_hook;
+}
+
 void vga_init(void) {
     color = make_color(VGA_LIGHT_GREY, VGA_BLACK);
 }
@@ -21,6 +31,10 @@ void vga_set_color(uint8_t fg, uint8_t bg) {
 }
 
 void vga_clear(void) {
+    if (output_hook) {
+        output_hook('\f');
+        return;
+    }
     for (size_t y = 0; y < VGA_HEIGHT; y++)
         for (size_t x = 0; x < VGA_WIDTH; x++)
             VGA_MEMORY[y * VGA_WIDTH + x] = make_entry(' ', color);
@@ -39,6 +53,10 @@ static void scroll(void) {
 }
 
 void vga_putchar(char c) {
+    if (output_hook) {
+        output_hook(c);
+        return;
+    }
     if (c == '\n') { vga_newline(); return; }
     if (c == '\r') { col = 0; return; }
     if (c == '\b') { vga_backspace(); return; }
@@ -51,12 +69,20 @@ void vga_write(const char* str) {
 }
 
 void vga_newline(void) {
+    if (output_hook) {
+        output_hook('\n');
+        return;
+    }
     col = 0;
     row++;
     scroll();
 }
 
 void vga_backspace(void) {
+    if (output_hook) {
+        output_hook('\b');
+        return;
+    }
     if (col == 0 && row == 0) return;
     if (col == 0) { row--; col = VGA_WIDTH - 1; }
     else col--;

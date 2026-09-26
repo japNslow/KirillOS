@@ -14,6 +14,10 @@
 #include "mouse.h"
 #include "kcommander.h"
 #include "kaint.h"
+#include "mode13.h"
+#include "kgui.h"
+
+void kernel_execute_command(char* cmd);
 
 
 #define INPUT_MAX 128
@@ -400,10 +404,11 @@ static void handle_command(char* cmd) {
         vga_write("  mode13       - launch 320x200 256-color VGA Mode 13h demo\n");
         vga_write("  kcommander   - graphical Norton/Total Commander in Mode 13h (alias: kc)\n");
         vga_write("  kaint [file] - graphical paint program with mouse & BMP export\n");
+        vga_write("  kgui         - launch KGUI desktop environment (aliases: gui, win)\n");
     }
     else if (strcmp_(cmd, "about") == 0) {
         vga_write("KirillOS v0.2 - minimal x86 OS\n");
-        vga_write("kboot + KHEX Runner + Kdhe Hex Editor + Kmidi Tracker + Mode 13h + KFS + Kaint\n");
+        vga_write("kboot + KHEX Runner + Kdhe Hex Editor + Kmidi Tracker + Mode 13h + KFS + Kaint + KGUI\n");
     }
     else if (strcmp_(cmd, "kfetch") == 0 || strcmp_(cmd, "fetch") == 0) {
         kfetch_print();
@@ -426,6 +431,11 @@ static void handle_command(char* cmd) {
     else if (command_is(cmd, "kaint") || command_is(cmd, "paint")) {
         char* file = next_word(cmd + (command_is(cmd, "kaint") ? 5 : 5));
         kaint_start(file);
+    }
+    else if (strcmp_(cmd, "kgui") == 0 || strcmp_(cmd, "gui") == 0 || strcmp_(cmd, "win") == 0) {
+        kgui_start();
+        vga_clear();
+        vga_set_cursor(0, 0);
     }
     else if (strcmp_(cmd, "clear") == 0) {
         vga_clear();
@@ -616,6 +626,10 @@ static void handle_command(char* cmd) {
         vga_newline();
         vga_set_color(VGA_LIGHT_GREY, VGA_BLACK);
     }
+}
+
+void kernel_execute_command(char* cmd) {
+    handle_command(cmd);
 }
 
 /* ================================================================ */

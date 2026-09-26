@@ -26,4 +26,8 @@ void vga_newline(void);
 void vga_write_hex(uint32_t value, int digits);
 void vga_set_cursor(size_t r, size_t c);
 
+typedef void (*vga_output_hook_t)(char c);
+void vga_set_output_hook(vga_output_hook_t hook);
+vga_output_hook_t vga_get_output_hook(void);
+
 #endif
