@@ -2,7 +2,7 @@
 #include "ata.h"
 #include <stdint.h>
 
-#define KFS_MAGIC            0x4B465333  /* KFS3 */
+#define KFS_MAGIC            0x4B465334  /* KFS4 */
 #define KFS_FIRST_SECTOR     321         /* Superblock */
 #define KFS_DIR_SECTOR       322         /* Directory Table (512 bytes = 1 sector) */
 #define KFS_DATA_START       323         /* First data sector */
@@ -29,15 +29,42 @@ static uint32_t get32(const uint8_t* p) {
            ((uint32_t)p[3] << 24);
 }
 
+static int string_equal(const char* a, const char* b) {
+    while (*a && *a == *b) {
+        a++;
+        b++;
+    }
+    return *a == *b;
+}
+
+static int string_length(const char* value) {
+    int length = 0;
+    while (value && value[length]) length++;
+    return length;
+}
+
+static int valid_name(const char* name) {
+    int length;
+    if (!name || !name[0]) return 0;
+    length = string_length(name);
+    if (length >= KFS_NAME_MAX) return 0;
+    for (int i = 0; i < length; i++) {
+        char c = name[i];
+        if (c < 32 || c > 126 || c == ' ' || c == '/' || c == '\\') return 0;
+    }
+    return 1;
+}
+
 static void save_dir(void) {
     if (!persistent) return;
     for (int i = 0; i < 512; i++) sector[i] = 0;
     for (int f = 0; f < KFS_MAX_FILES; f++) {
         int off = f * 32;
-        put32(sector + off, (uint32_t)files[f].used);
+        put32(sector + off, (uint32_t)(files[f].used == 1 ? 1 : 0));
         put32(sector + off + 4, (uint32_t)files[f].size);
         for (int i = 0; i < KFS_NAME_MAX; i++) {
             sector[off + 8 + i] = (uint8_t)files[f].name[i];
+            if (!files[f].name[i]) break;
         }
     }
     (void)ata_write28(KFS_DIR_SECTOR, sector);
@@ -77,10 +104,21 @@ static int load(void) {
         for (int i = 0; i < KFS_NAME_MAX; i++) {
             files[f].name[i] = (char)sector[off + 8 + i];
         }
+        files[f].name[KFS_NAME_MAX - 1] = 0;
         files[f].data[0] = 0;
 
+        /* Validate entry integrity */
+        if (files[f].used != 1 || !valid_name(files[f].name) ||
+            files[f].size < 0 || files[f].size > KFS_DATA_MAX) {
+            files[f].used = 0;
+            files[f].size = 0;
+            files[f].name[0] = 0;
+            files[f].data[0] = 0;
+            continue;
+        }
+
         /* Load file data if used */
-        if (files[f].used && files[f].size > 0) {
+        if (files[f].size > 0) {
             int num_sec = (files[f].size + 511) / 512;
             if (num_sec > KFS_SECTORS_PER_FILE) num_sec = KFS_SECTORS_PER_FILE;
             uint32_t start_lba = KFS_DATA_START + f * KFS_SECTORS_PER_FILE;
@@ -97,32 +135,6 @@ static int load(void) {
                 files[f].data[files[f].size] = 0;
             }
         }
-    }
-    return 1;
-}
-
-static int string_equal(const char* a, const char* b) {
-    while (*a && *a == *b) {
-        a++;
-        b++;
-    }
-    return *a == *b;
-}
-
-static int string_length(const char* value) {
-    int length = 0;
-    while (value && value[length]) length++;
-    return length;
-}
-
-static int valid_name(const char* name) {
-    int length;
-    if (!name || !name[0]) return 0;
-    length = string_length(name);
-    if (length >= KFS_NAME_MAX) return 0;
-    for (int i = 0; i < length; i++) {
-        char c = name[i];
-        if (c == ' ' || c == '/' || c == '\\') return 0;
     }
     return 1;
 }
@@ -203,6 +215,7 @@ kfs_result_t kfs_touch(const char* name) {
         files[slot].name[i] = name[i];
         if (!name[i]) break;
     }
+    files[slot].name[KFS_NAME_MAX - 1] = 0;
     files[slot].data[0] = 0;
     save_dir();
     return KFS_OK;
