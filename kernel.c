@@ -221,16 +221,16 @@ static void log_ata_kfs(void) {
 
     log_tag("kfs");
     if (kfs_is_persistent()) {
-        vga_write("sector 1 magic=");
-        log_hex(0x4B465331, 8);
+        vga_write("sector 321 magic=");
+        log_hex(0x4B465333, 8);
         vga_write(" ");
         print_number(kfs_file_count());
-        vga_write("/32 slots persistent");
+        vga_write("/16 slots persistent");
         log_ok();
     } else {
         vga_write("no disk, ");
         print_number(kfs_file_count());
-        vga_write("/32 slots RAM-fallback");
+        vga_write("/16 slots RAM-fallback");
     }
     vga_newline();
 }

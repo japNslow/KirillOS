@@ -34,7 +34,10 @@ static inline uint16_t inw(uint16_t port) {
 
 static int wait_ready(void) {
     uint8_t status;
-    for (int i = 0; i < 1000000; i++) {
+    /* 400ns delay for status to stabilize */
+    for (int i = 0; i < 4; i++) inb(ATA_STATUS);
+
+    for (int i = 0; i < 100000; i++) {
         status = inb(ATA_STATUS);
         if (status == 0xFF) return 0;
         if (!(status & 0x80) && (status & 0x08)) return 1;
@@ -63,7 +66,14 @@ static int transfer(uint32_t lba, uint8_t* buffer, int write) {
             buffer[i * 2 + 1] = (uint8_t)(word >> 8);
         }
     }
-    if (write) inb(ATA_STATUS);
+    if (write) {
+        /* Wait for drive to finish writing and clear BSY */
+        for (int i = 0; i < 4; i++) inb(ATA_STATUS);
+        for (int i = 0; i < 100000; i++) {
+            uint8_t st = inb(ATA_STATUS);
+            if (!(st & 0x80)) break;
+        }
+    }
     return 1;
 }
 

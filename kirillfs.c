@@ -2,12 +2,11 @@
 #include "ata.h"
 #include <stdint.h>
 
-#define KFS_MAGIC 0x4B465332
-#define KFS_FIRST_SECTOR 321
-
-#define KFS_HEADER_SIZE 4
-#define KFS_RECORD_SIZE (4 + 4 + KFS_NAME_MAX + KFS_DATA_MAX)
-#define KFS_SECTOR_COUNT ((KFS_HEADER_SIZE + KFS_MAX_FILES * KFS_RECORD_SIZE + 511) / 512)
+#define KFS_MAGIC            0x4B465333  /* KFS3 */
+#define KFS_FIRST_SECTOR     321         /* Superblock */
+#define KFS_DIR_SECTOR       322         /* Directory Table (512 bytes = 1 sector) */
+#define KFS_DATA_START       323         /* First data sector */
+#define KFS_SECTORS_PER_FILE ((KFS_DATA_MAX + 511) / 512) /* 96 sectors for 48KB */
 
 typedef struct {
     int used;
@@ -30,50 +29,74 @@ static uint32_t get32(const uint8_t* p) {
            ((uint32_t)p[3] << 24);
 }
 
-static void save(void) {
+static void save_dir(void) {
     if (!persistent) return;
-
-    // Sector 0: magic (4 bytes) + first 508 bytes of files array
     for (int i = 0; i < 512; i++) sector[i] = 0;
-    put32(sector, KFS_MAGIC);
-    const uint8_t* src = (const uint8_t*)files;
-    int total_bytes = (int)sizeof(files);
-    int chunk = (total_bytes > 508) ? 508 : total_bytes;
-    for (int i = 0; i < chunk; i++) sector[4 + i] = src[i];
-    (void)ata_write28(KFS_FIRST_SECTOR, sector);
+    for (int f = 0; f < KFS_MAX_FILES; f++) {
+        int off = f * 32;
+        put32(sector + off, (uint32_t)files[f].used);
+        put32(sector + off + 4, (uint32_t)files[f].size);
+        for (int i = 0; i < KFS_NAME_MAX; i++) {
+            sector[off + 8 + i] = (uint8_t)files[f].name[i];
+        }
+    }
+    (void)ata_write28(KFS_DIR_SECTOR, sector);
+}
 
-    // Remaining sectors:
-    int offset = 508;
-    int s = 1;
-    while (offset < total_bytes && s < (int)KFS_SECTOR_COUNT) {
+static void save_file_data(int slot) {
+    if (!persistent || slot < 0 || slot >= KFS_MAX_FILES) return;
+    int num_sec = (files[slot].size + 511) / 512;
+    if (num_sec <= 0) return;
+    if (num_sec > KFS_SECTORS_PER_FILE) num_sec = KFS_SECTORS_PER_FILE;
+
+    uint32_t start_lba = KFS_DATA_START + slot * KFS_SECTORS_PER_FILE;
+    for (int s = 0; s < num_sec; s++) {
         for (int i = 0; i < 512; i++) sector[i] = 0;
-        int rem = total_bytes - offset;
-        int cur_chunk = (rem > 512) ? 512 : rem;
-        for (int i = 0; i < cur_chunk; i++) sector[i] = src[offset + i];
-        (void)ata_write28(KFS_FIRST_SECTOR + s, sector);
-        offset += cur_chunk;
-        s++;
+        int rem = files[slot].size - s * 512;
+        int chunk = rem > 512 ? 512 : rem;
+        for (int i = 0; i < chunk; i++) {
+            sector[i] = (uint8_t)files[slot].data[s * 512 + i];
+        }
+        (void)ata_write28(start_lba + s, sector);
     }
 }
 
 static int load(void) {
-    if (!persistent || !ata_read28(KFS_FIRST_SECTOR, sector) ||
-        get32(sector) != KFS_MAGIC) return 0;
+    if (!persistent) return 0;
 
-    uint8_t* dst = (uint8_t*)files;
-    int total_bytes = (int)sizeof(files);
-    int chunk = (total_bytes > 508) ? 508 : total_bytes;
-    for (int i = 0; i < chunk; i++) dst[i] = sector[4 + i];
+    /* 1. Superblock check */
+    if (!ata_read28(KFS_FIRST_SECTOR, sector)) return 0;
+    if (get32(sector) != KFS_MAGIC) return 0;
 
-    int offset = 508;
-    int s = 1;
-    while (offset < total_bytes && s < (int)KFS_SECTOR_COUNT) {
-        if (!ata_read28(KFS_FIRST_SECTOR + s, sector)) return 0;
-        int rem = total_bytes - offset;
-        int cur_chunk = (rem > 512) ? 512 : rem;
-        for (int i = 0; i < cur_chunk; i++) dst[offset + i] = sector[i];
-        offset += cur_chunk;
-        s++;
+    /* 2. Directory table */
+    if (!ata_read28(KFS_DIR_SECTOR, sector)) return 0;
+    for (int f = 0; f < KFS_MAX_FILES; f++) {
+        int off = f * 32;
+        files[f].used = (int)get32(sector + off);
+        files[f].size = (int)get32(sector + off + 4);
+        for (int i = 0; i < KFS_NAME_MAX; i++) {
+            files[f].name[i] = (char)sector[off + 8 + i];
+        }
+        files[f].data[0] = 0;
+
+        /* Load file data if used */
+        if (files[f].used && files[f].size > 0) {
+            int num_sec = (files[f].size + 511) / 512;
+            if (num_sec > KFS_SECTORS_PER_FILE) num_sec = KFS_SECTORS_PER_FILE;
+            uint32_t start_lba = KFS_DATA_START + f * KFS_SECTORS_PER_FILE;
+            for (int s = 0; s < num_sec; s++) {
+                if (ata_read28(start_lba + s, sector)) {
+                    int rem = files[f].size - s * 512;
+                    int chunk = rem > 512 ? 512 : rem;
+                    for (int i = 0; i < chunk; i++) {
+                        files[f].data[s * 512 + i] = (char)sector[i];
+                    }
+                }
+            }
+            if (files[f].size < KFS_DATA_MAX) {
+                files[f].data[files[f].size] = 0;
+            }
+        }
     }
     return 1;
 }
@@ -88,7 +111,7 @@ static int string_equal(const char* a, const char* b) {
 
 static int string_length(const char* value) {
     int length = 0;
-    while (value[length]) length++;
+    while (value && value[length]) length++;
     return length;
 }
 
@@ -105,8 +128,9 @@ static int valid_name(const char* name) {
 }
 
 static int find_file(const char* name) {
-    for (int i = 0; i < KFS_MAX_FILES; i++)
+    for (int i = 0; i < KFS_MAX_FILES; i++) {
         if (files[i].used && string_equal(files[i].name, name)) return i;
+    }
     return -1;
 }
 
@@ -117,7 +141,17 @@ void kfs_format(void) {
         files[i].name[0] = 0;
         files[i].data[0] = 0;
     }
-    save();
+    if (!persistent) return;
+
+    /* Write Superblock */
+    for (int i = 0; i < 512; i++) sector[i] = 0;
+    put32(sector, KFS_MAGIC);
+    put32(sector + 4, KFS_MAX_FILES);
+    put32(sector + 8, KFS_DATA_MAX);
+    (void)ata_write28(KFS_FIRST_SECTOR, sector);
+
+    /* Write empty Directory Table */
+    save_dir();
 }
 
 void kfs_init(void) {
@@ -170,7 +204,7 @@ kfs_result_t kfs_touch(const char* name) {
         if (!name[i]) break;
     }
     files[slot].data[0] = 0;
-    save();
+    save_dir();
     return KFS_OK;
 }
 
@@ -182,7 +216,8 @@ kfs_result_t kfs_write_binary(const char* name, const void* data, int length) {
     for (int i = 0; i < length; i++) files[slot].data[i] = (char)src[i];
     files[slot].data[length] = 0;
     files[slot].size = length;
-    save();
+    save_dir();
+    save_file_data(slot);
     return KFS_OK;
 }
 
@@ -205,6 +240,6 @@ kfs_result_t kfs_remove(const char* name) {
     files[slot].size = 0;
     files[slot].name[0] = 0;
     files[slot].data[0] = 0;
-    save();
+    save_dir();
     return KFS_OK;
 }
