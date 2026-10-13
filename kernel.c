@@ -14,7 +14,6 @@
 #include "mouse.h"
 #include "kcommander.h"
 #include "kaint.h"
-#include "mode13.h"
 #include "kgui.h"
 
 void kernel_execute_command(char* cmd);
@@ -557,8 +556,7 @@ static void handle_command(char* cmd) {
         }
     }
     else if (command_is(cmd, "kmidi") || command_is(cmd, "kidi")) {
-        char* name = next_word(cmd + 5);
-        if (!name && command_is(cmd, "kidi")) name = next_word(cmd + 4);
+        char* name = next_word(cmd + (command_is(cmd, "kmidi") ? 5 : 4));
         if (!name) vga_write("Usage: kmidi SONG.KMIDI\n");
         else kmidi_open(name);
     }
