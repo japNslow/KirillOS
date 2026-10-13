@@ -150,7 +150,7 @@ flowchart TD
 
 ## ⚙️ Stage 1: Загрузочный сектор MBR (`kboot_mbr.asm`)
 
-Файл [kboot_mbr.asm](file:///d:/cppproject/KirillOS/kboot_mbr.asm) собирается с помощью NASM в сырой 512-байтный бинарный файл `kboot_mbr.bin`. В конце сектора обязательно присутствует сигнатура `0xAA55`.
+Файл [kboot_mbr.asm](../kboot_mbr.asm) собирается с помощью NASM в сырой 512-байтный бинарный файл `kboot_mbr.bin`. В конце сектора обязательно присутствует сигнатура `0xAA55`.
 
 ### Инициализация Real Mode и Стек
 
@@ -310,7 +310,7 @@ gdt_desc:
 
 ## 🖥️ Stage 2: 32-битный Загрузочный Монитор
 
-Stage 2 состоит из связки ассемблерного модуля [kboot_entry.asm](file:///d:/cppproject/KirillOS/kboot_entry.asm) и C-кода [kboot.c](file:///d:/cppproject/KirillOS/kboot.c), скомпонованных скриптом [kboot_linker.ld](file:///d:/cppproject/KirillOS/kboot_linker.ld) по базовому адресу `0x8000`.
+Stage 2 состоит из связки ассемблерного модуля [kboot_entry.asm](../kboot_entry.asm) и C-кода [kboot.c](../kboot.c), скомпонованных скриптом [kboot_linker.ld](../kboot_linker.ld) по базовому адресу `0x8000`.
 
 ### Точка входа и регистры Protected Mode
 
@@ -346,7 +346,7 @@ _kboot_start:
 
 Если включить прерывания без ремаппинга, любое нажатие клавиши или тиканье таймера приведет к вызову паники процессора.
 
-Функция `pic_remap()` в [kboot.c](file:///d:/cppproject/KirillOS/kboot.c#L163-L180) перенастраивает Master PIC и Slave PIC:
+Функция `pic_remap()` в [kboot.c](../kboot.c#L163-L180) перенастраивает Master PIC и Slave PIC:
 * **Master PIC**: векторы сдвигаются на `0x20..0x27` (IRQ0 = 0x20, IRQ1 = 0x21).
 * **Slave PIC**: векторы сдвигаются на `0x28..0x2F` (IRQ8 = 0x28).
 * **Аппаратные маски**: загрузчику требуется только клавиатура, поэтому маскируются все прерывания, кроме IRQ1:
@@ -593,7 +593,7 @@ jump_to_kernel:
 
 ## 🔨 Сборка и Создание Образа Диска
 
-Сборка загрузчика полностью автоматизирована в скрипте [build.bat](file:///d:/cppproject/KirillOS/build.bat):
+Сборка загрузчика полностью автоматизирована в скрипте [build.bat](../build.bat):
 
 ### 1. Компиляция Stage 1 (MBR):
 ```cmd
@@ -607,7 +607,7 @@ i686-elf-gcc -m32 -c kboot.c -o kboot.o -ffreestanding -fno-pie -fno-stack-prote
 i686-elf-ld -m elf_i386 -T kboot_linker.ld --oformat binary -o kboot.bin kboot_entry.o kboot.o
 ```
 
-### 3. Сборка образа диска ([create_image.py](file:///d:/cppproject/KirillOS/create_image.py)):
+### 3. Сборка образа диска ([create_image.py](../create_image.py)):
 Скрипт на Python собирает финальный 64 МБ файл `kirillos.img`:
 - Записывает `kboot_mbr.bin` в LBA 0 (512 байт).
 - Записывает `kboot.bin` в LBA 1..64 (ровно 64 сектора = 32 КБ с выравниванием нулями).
@@ -624,9 +624,9 @@ qemu-system-x86_64 -drive file=kirillos.img,format=raw,if=ide -m 128M
 
 | Файл | Язык | Назначение |
 | :--- | :--- | :--- |
-| [kboot_mbr.asm](file:///d:/cppproject/KirillOS/kboot_mbr.asm) | x86 ASM (16-bit) | Stage 1 MBR: включение A20, чтение диска через INT 13h LBA, переход в Protected Mode. |
-| [kboot_entry.asm](file:///d:/cppproject/KirillOS/kboot_entry.asm) | x86 ASM (32-bit) | Точка входа `_kboot_start`, ассемблерный обработчик `isr_keyboard_stub`, передача управления `jump_to_kernel`. |
-| [kboot.c](file:///d:/cppproject/KirillOS/kboot.c) | C99 (Freestanding) | Главная логика: драйвер VGA, ремап PIC, IDT, драйвер клавиатуры, Shell, ELF32 загрузчик. |
-| [kboot.h](file:///d:/cppproject/KirillOS/kboot.h) | C99 Header | Прототипы функций `kboot_main()` и `kboot_keyboard_isr_c()`. |
-| [kboot_linker.ld](file:///d:/cppproject/KirillOS/kboot_linker.ld) | GNU Linker Script | Размещение секций Stage 2 по базовому адресу `0x8000`. |
-| [create_image.py](file:///d:/cppproject/KirillOS/create_image.py) | Python 3 | Сборка дискового образа с жесткой привязкой секторов MBR, kboot и ядра. |
+| [kboot_mbr.asm](../kboot_mbr.asm) | x86 ASM (16-bit) | Stage 1 MBR: включение A20, чтение диска через INT 13h LBA, переход в Protected Mode. |
+| [kboot_entry.asm](../kboot_entry.asm) | x86 ASM (32-bit) | Точка входа `_kboot_start`, ассемблерный обработчик `isr_keyboard_stub`, передача управления `jump_to_kernel`. |
+| [kboot.c](../kboot.c) | C99 (Freestanding) | Главная логика: драйвер VGA, ремап PIC, IDT, драйвер клавиатуры, Shell, ELF32 загрузчик. |
+| [kboot.h](../kboot.h) | C99 Header | Прототипы функций `kboot_main()` и `kboot_keyboard_isr_c()`. |
+| [kboot_linker.ld](../kboot_linker.ld) | GNU Linker Script | Размещение секций Stage 2 по базовому адресу `0x8000`. |
+| [create_image.py](../create_image.py) | Python 3 | Сборка дискового образа с жесткой привязкой секторов MBR, kboot и ядра. |
