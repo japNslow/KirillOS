@@ -118,9 +118,14 @@ if errorlevel 1 goto :error
 if errorlevel 1 goto :error
 "%GCC%" -m32 -c kgui.c -o kgui.o -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -Os
 if errorlevel 1 goto :error
+"%GCC%" -m32 -c e1000.c -o e1000.o -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -Os
+if errorlevel 1 goto :error
+"%GCC%" -m32 -c net.c -o net.o -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -Os
+if errorlevel 1 goto :error
 
 echo [4/5] Linking KirillOS kernel...
-"%LD%" -m elf_i386 -T linker.ld -o %OUT% boot.o kernel.o keyboard.o vga.o kirillfs.o kmemory.o ata.o sound.o ac97.o kano.o kdhe.o kmidi.o khex.o khexd.o kfetch.o mode13.o mouse.o kcommander.o kaint.o kguiq.o kguid.o kgui.o
+REM -s drops symbol tables: kboot only needs program headers, and the kernel must fit in 128 KB
+"%LD%" -m elf_i386 -s -T linker.ld -o %OUT% boot.o kernel.o keyboard.o vga.o kirillfs.o kmemory.o ata.o sound.o ac97.o kano.o kdhe.o kmidi.o khex.o khexd.o kfetch.o mode13.o mouse.o kcommander.o kaint.o kguiq.o kguid.o kgui.o e1000.o net.o
 
 if errorlevel 1 goto :error
 
@@ -133,7 +138,7 @@ echo [DONE] Build successful!
 echo Starting QEMU with native kboot...
 echo.
 
-%QEMU% -drive file=%DISK_IMG%,format=raw,if=ide %AUDIO_ARGS% -machine pcspk-audiodev=kirillos_audio -device AC97,audiodev=kirillos_audio -m 128M
+%QEMU% -drive file=%DISK_IMG%,format=raw,if=ide %AUDIO_ARGS% -machine pcspk-audiodev=kirillos_audio -device AC97,audiodev=kirillos_audio -nic user,model=e1000 -m 128M
 goto :eof
 
 :error

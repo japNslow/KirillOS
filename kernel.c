@@ -15,6 +15,8 @@
 #include "kcommander.h"
 #include "kaint.h"
 #include "kgui.h"
+#include "e1000.h"
+#include "net.h"
 
 void kernel_execute_command(char* cmd);
 
@@ -273,6 +275,35 @@ static void log_sound_init(void) {
     vga_newline();
 }
 
+static void log_net_init(void) {
+    log_tag("net");
+    if (!net_init()) {
+        vga_write("no e1000 NIC, networking disabled");
+        vga_newline();
+        return;
+    }
+    vga_write("e1000 mmio=");
+    log_hex(e1000_mmio_base(), 8);
+    vga_write(" mac=");
+    for (int i = 0; i < 6; i++) {
+        vga_write_hex(e1000_mac()[i], 2);
+        if (i < 5) vga_putchar(':');
+    }
+    if (e1000_link_up()) log_ok(); else log_fail();
+    vga_newline();
+
+    log_tag("dhcp");
+    if (net_dhcp(0)) {
+        vga_write("ip=");
+        net_print_ip(net_ip());
+        log_ok();
+    } else {
+        vga_write("no lease, use 'dhcp' to retry");
+        log_fail();
+    }
+    vga_newline();
+}
+
 /* ================================================================ */
 /*                     String helpers                               */
 /* ================================================================ */
@@ -411,6 +442,11 @@ static void handle_command(char* cmd) {
         vga_write("  kcommander   - graphical Norton/Total Commander in Mode 13h (alias: kc)\n");
         vga_write("  kaint [file] - graphical paint program with mouse & BMP export\n");
         vga_write("  kgui         - launch KGUI desktop environment (aliases: gui, win)\n");
+        vga_write("  ifconfig     - network status (alias: net)\n");
+        vga_write("  dhcp         - get an IP address via DHCP\n");
+        vga_write("  ping H [N]   - ICMP echo to host or IP (default 4 times)\n");
+        vga_write("  tcping H [P] [N] - TCP connect probe, real RTT (default port 80)\n");
+        vga_write("  host NAME    - resolve a name via DNS\n");
     }
     else if (strcmp_(cmd, "about") == 0) {
         vga_write("KirillOS v0.2 - minimal x86 OS\n");
@@ -445,6 +481,51 @@ static void handle_command(char* cmd) {
     }
     else if (strcmp_(cmd, "clear") == 0) {
         vga_clear();
+    }
+    else if (strcmp_(cmd, "ifconfig") == 0 || strcmp_(cmd, "net") == 0) {
+        net_ifconfig();
+    }
+    else if (strcmp_(cmd, "dhcp") == 0) {
+        if (!e1000_present()) net_ifconfig();
+        else net_dhcp(1);
+    }
+    else if (command_is(cmd, "ping")) {
+        char* host = next_word(cmd + 4);
+        if (!host) {
+            vga_write("Usage: ping HOST [COUNT]\n");
+        } else {
+            char* count = host;
+            while (*count && *count != ' ') count++;
+            if (*count) *count++ = 0;
+            count = next_word(count);
+            uint32_t n = count ? parse_number(count) : 4;
+            net_ping(host, n ? (int)n : 4);
+        }
+    }
+    else if (command_is(cmd, "tcping")) {
+        char* host = next_word(cmd + 6);
+        if (!host) {
+            vga_write("Usage: tcping HOST [PORT] [COUNT]\n");
+        } else {
+            char* port = host;
+            while (*port && *port != ' ') port++;
+            if (*port) *port++ = 0;
+            port = next_word(port);
+            char* count = port;
+            if (count) {
+                while (*count && *count != ' ') count++;
+                count = next_word(count);
+            }
+            uint32_t p = port ? parse_number(port) : 80;
+            uint32_t n = count ? parse_number(count) : 4;
+            if (!p || p > 65535) vga_write("tcping: bad port\n");
+            else net_tcping(host, (uint16_t)p, n ? (int)n : 4);
+        }
+    }
+    else if (command_is(cmd, "host") || command_is(cmd, "nslookup")) {
+        char* name = next_word(cmd + (command_is(cmd, "host") ? 4 : 8));
+        if (!name) vga_write("Usage: host NAME\n");
+        else net_host(name);
     }
     else if (command_is(cmd, "run")) {
 
@@ -656,6 +737,7 @@ void kernel_main(uint32_t magic, uint32_t mbi) {
     log_ata_kfs();
     log_heap_init();
     log_sound_init();
+    log_net_init();   /* after sound_init: needs PIT ch0 at 1 kHz */
 
     /* ---- All systems go ---- */
     log_tag("init");
