@@ -587,6 +587,7 @@ static void prompt_read_file(void) {
 }
 
 static void show_help(void) {
+    vga_set_color(VGA_LIGHT_GREY, VGA_BLACK);
     vga_clear();
     vga_set_color(VGA_BLACK, VGA_LIGHT_CYAN);
     vga_write("                         KANO v0.2 - GNU nano Clone Help                        \n");
@@ -690,6 +691,8 @@ void kano_open_named(const char* name, const char* title) {
         /* Exit commands */
         if (c == KEY_CTRL_X || c == KEY_QUIT || c == KEY_ESC) {
             if (confirm_exit()) {
+                /* Prompts leave black-on-cyan active; restore shell colors */
+                vga_set_color(VGA_LIGHT_GREY, VGA_BLACK);
                 vga_clear();
                 return;
             }
@@ -722,8 +725,8 @@ void kano_open_named(const char* name, const char* title) {
         else if (c == KEY_CTRL_R) {
             prompt_read_file();
         }
-        /* Go to line: Ctrl+\ (ASCII 28) or Ctrl+J */
-        else if (c == 28 || c == KEY_CTRL_J) {
+        /* Go to line: Ctrl+\ (ASCII 28). Not Ctrl+J: it is 10, same as Enter */
+        else if (c == 28) {
             prompt_goto_line();
         }
         /* Navigation: Home / Ctrl+A */
