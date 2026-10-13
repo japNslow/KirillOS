@@ -210,7 +210,7 @@ static void save_kdhe(void) {
         redraw();
     } else {
         vga_set_color(VGA_LIGHT_RED, VGA_BLACK);
-        vga_write("\nSave failed: KirillFS error or file too large (max 511 bytes)\n");
+        vga_write("\nSave failed: KirillFS error\n");
         vga_set_color(VGA_LIGHT_GREY, VGA_BLACK);
     }
 }

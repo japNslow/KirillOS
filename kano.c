@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define KANO_BUFFER_SIZE  KFS_DATA_MAX   /* 2048 bytes */
+#define KANO_BUFFER_SIZE  KFS_DATA_MAX   /* 48 KB */
 #define EDIT_ROWS         21
 #define SCREEN_COLS       80
 #define SCREEN_ROWS       25
@@ -250,7 +250,7 @@ static void redraw(void) {
 
 static void insert_char(char c) {
     if (length >= KANO_BUFFER_SIZE - 1) {
-        set_status("[ Buffer full (max 2048 bytes) ]", 1);
+        set_status("[ Buffer full (max 48 KB) ]", 1);
         return;
     }
     for (int i = length; i >= cursor; i--) {

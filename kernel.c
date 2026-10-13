@@ -296,7 +296,11 @@ static void fs_error(kfs_result_t result) {
     else if (result == KFS_EXISTS) vga_write("File already exists\n");
     else if (result == KFS_FULL) vga_write("KirillFS: no free file slots\n");
     else if (result == KFS_INVALID_NAME) vga_write("Invalid file name\n");
-    else if (result == KFS_TOO_LARGE) vga_write("File is too large (max 511 bytes)\n");
+    else if (result == KFS_TOO_LARGE) {
+        vga_write("File is too large (max ");
+        print_number(KFS_DATA_MAX / 1024);
+        vga_write(" KB)\n");
+    }
     else vga_write("KirillFS error\n");
     vga_set_color(VGA_LIGHT_GREY, VGA_BLACK);
 }
@@ -359,7 +363,10 @@ static void handle_fs_command(char* cmd) {
         vga_write("KirillFS formatted\n");
     } else if (strcmp_(cmd, "fsinfo") == 0) {
         vga_write("KirillFS: ");
-        vga_write("32 files, 511 bytes per file, ");
+        print_number(KFS_MAX_FILES);
+        vga_write(" files, ");
+        print_number(KFS_DATA_MAX / 1024);
+        vga_write(" KB per file, ");
         vga_write(kfs_is_persistent() ? "persistent ATA disk\n" : "in-memory fallback\n");
     } else {
         vga_write("KirillFS commands: ls, touch, write, cat, rm, format, fsinfo\n");
