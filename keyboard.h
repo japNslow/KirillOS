@@ -57,6 +57,7 @@ void    keyboard_check_hardware(void);
 char    keyboard_getchar(void);       /* blocking read */
 int     keyboard_has_char(void);
 char    keyboard_poll(void);          /* 0 if empty */
+int     keyboard_take_esc(void);      /* 1 if ESC was pending; keeps other keys */
 void    keyboard_handle_scancode(uint8_t sc);
 
 #endif

@@ -119,6 +119,18 @@ char keyboard_poll(void) {
     return c;
 }
 
+/* Consume a pending ESC (and keys typed before it); other type-ahead stays queued */
+int keyboard_take_esc(void) {
+    keyboard_check_hardware();
+    for (uint32_t i = buf_tail; i != buf_head; i = (i + 1) % BUF_SIZE) {
+        if (buf[i] == KEY_ESC) {
+            buf_tail = (i + 1) % BUF_SIZE;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 char keyboard_getchar(void) {
     while (1) {
         keyboard_check_hardware();
