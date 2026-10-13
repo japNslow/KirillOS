@@ -12,6 +12,19 @@ static inline uint16_t make_entry(char c, uint8_t col) {
     return (uint16_t)c | ((uint16_t)col << 8);
 }
 
+static inline void outb(uint16_t port, uint8_t val) {
+    __asm__ volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
+}
+
+/* Move the blinking CRTC cursor to the current (row, col) */
+static void sync_cursor(void) {
+    uint16_t pos = (uint16_t)(row * VGA_WIDTH + col);
+    outb(0x3D4, 0x0F);
+    outb(0x3D5, (uint8_t)(pos & 0xFF));
+    outb(0x3D4, 0x0E);
+    outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
+}
+
 static vga_output_hook_t output_hook = 0;
 
 void vga_set_output_hook(vga_output_hook_t hook) {
@@ -40,6 +53,7 @@ void vga_clear(void) {
             VGA_MEMORY[y * VGA_WIDTH + x] = make_entry(' ', color);
     row = 0;
     col = 0;
+    sync_cursor();
 }
 
 static void scroll(void) {
@@ -52,41 +66,45 @@ static void scroll(void) {
     row = VGA_HEIGHT - 1;
 }
 
+/* Draw one character without touching the CRTC cursor */
+static void put_raw(char c) {
+    if (c == '\n') { col = 0; row++; scroll(); return; }
+    if (c == '\r') { col = 0; return; }
+    if (c == '\b') {
+        if (col == 0 && row == 0) return;
+        if (col == 0) { row--; col = VGA_WIDTH - 1; }
+        else col--;
+        VGA_MEMORY[row * VGA_WIDTH + col] = make_entry(' ', color);
+        return;
+    }
+    VGA_MEMORY[row * VGA_WIDTH + col] = make_entry(c, color);
+    if (++col >= VGA_WIDTH) { col = 0; row++; scroll(); }
+}
+
 void vga_putchar(char c) {
     if (output_hook) {
         output_hook(c);
         return;
     }
-    if (c == '\n') { vga_newline(); return; }
-    if (c == '\r') { col = 0; return; }
-    if (c == '\b') { vga_backspace(); return; }
-    VGA_MEMORY[row * VGA_WIDTH + col] = make_entry(c, color);
-    if (++col >= VGA_WIDTH) { col = 0; row++; scroll(); }
+    put_raw(c);
+    sync_cursor();
 }
 
 void vga_write(const char* str) {
-    while (*str) vga_putchar(*str++);
+    if (output_hook) {
+        while (*str) output_hook(*str++);
+        return;
+    }
+    while (*str) put_raw(*str++);
+    sync_cursor();
 }
 
 void vga_newline(void) {
-    if (output_hook) {
-        output_hook('\n');
-        return;
-    }
-    col = 0;
-    row++;
-    scroll();
+    vga_putchar('\n');
 }
 
 void vga_backspace(void) {
-    if (output_hook) {
-        output_hook('\b');
-        return;
-    }
-    if (col == 0 && row == 0) return;
-    if (col == 0) { row--; col = VGA_WIDTH - 1; }
-    else col--;
-    VGA_MEMORY[row * VGA_WIDTH + col] = make_entry(' ', color);
+    vga_putchar('\b');
 }
 
 void vga_write_hex(uint32_t value, int digits) {
@@ -95,18 +113,10 @@ void vga_write_hex(uint32_t value, int digits) {
         vga_putchar(hex[(value >> (i * 4)) & 0xF]);
 }
 
-static inline void outb(uint16_t port, uint8_t val) {
-    __asm__ volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
-}
-
 void vga_set_cursor(size_t r, size_t c) {
     if (r >= VGA_HEIGHT) r = VGA_HEIGHT - 1;
     if (c >= VGA_WIDTH) c = VGA_WIDTH - 1;
     row = r;
     col = c;
-    uint16_t pos = (uint16_t)(row * VGA_WIDTH + col);
-    outb(0x3D4, 0x0F);
-    outb(0x3D5, (uint8_t)(pos & 0xFF));
-    outb(0x3D4, 0x0E);
-    outb(0x3D5, (uint8_t)((pos >> 8) & 0xFF));
+    sync_cursor();
 }
