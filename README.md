@@ -73,15 +73,26 @@
 ## 🛠️ Сборка и запуск
 
 ### Требования
-- `i686-elf-gcc` и `i686-elf-ld` (кросс-компилятор x86)
+- `i686-elf-gcc` и `i686-elf-ld` (кросс-компилятор x86); на Linux подойдут и обычные `gcc` и `ld`
 - `nasm`
 - `qemu-system-x86_64`
 - `python` (версия 3.x)
 
+На Linux всё ставится из репозиториев:
+```bash
+sudo pacman -S nasm gcc python qemu-system-x86 qemu-audio-pipewire   # Arch
+sudo apt install nasm gcc python3 qemu-system-x86                    # Debian / Ubuntu
+```
+
 ### Сборка
-Запустите командный скрипт:
+Windows:
 ```cmd
 build.bat
+```
+Linux:
+```bash
+./build.sh            # собрать и запустить
+./build.sh --no-run   # только собрать
 ```
 Скрипт автоматически:
 1. Соберёт загрузчик `kboot` (MBR + Stage 2).
