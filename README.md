@@ -80,8 +80,8 @@
 
 На Linux всё ставится из репозиториев:
 ```bash
-sudo pacman -S nasm gcc python qemu-system-x86 qemu-audio-pipewire   # Arch
-sudo apt install nasm gcc python3 qemu-system-x86                    # Debian / Ubuntu
+sudo pacman -S nasm gcc python qemu-system-x86 qemu-audio-pipewire qemu-ui-gtk   # Arch
+sudo apt install nasm gcc python3 qemu-system-x86 qemu-system-gui                # Debian / Ubuntu
 ```
 
 ### Сборка
@@ -91,7 +91,9 @@ build.bat
 ```
 Linux:
 ```bash
-./build.sh            # собрать и запустить
+./build.sh            # собрать и запустить (спросит: окно или VNC)
+./build.sh --window   # запустить в окне
+./build.sh --vnc      # запустить с VNC-сервером на localhost:5900
 ./build.sh --no-run   # только собрать
 ```
 Скрипт автоматически:

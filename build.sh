@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # KirillOS and kboot builder for Linux (the Linux counterpart of build.bat).
 #
-#   ./build.sh            build everything and start QEMU
+#   ./build.sh            build everything and start QEMU (asks: window or VNC)
+#   ./build.sh --window   start QEMU in a window (needs qemu-ui-gtk or qemu-ui-sdl)
+#   ./build.sh --vnc      start QEMU with a VNC server on localhost:5900
 #   ./build.sh --no-run   build only
 #
 # Tools: nasm, python3, qemu-system-x86_64 and either an i686-elf cross
@@ -12,10 +14,13 @@ set -u
 cd "$(dirname "$0")"
 
 RUN=1
+VIEW=
 for arg in "$@"; do
     case "$arg" in
         --no-run) RUN=0 ;;
-        -h|--help) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --window) VIEW=window ;;
+        --vnc) VIEW=vnc ;;
+        -h|--help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "[ERROR] Unknown option: $arg"; exit 1 ;;
     esac
 done
@@ -131,6 +136,42 @@ if [ -z "${AUDIO_DRIVER:-}" ]; then
 fi
 AUDIO_ARGS=(-audiodev "driver=$AUDIO_DRIVER,id=kirillos_audio,out.buffer-length=100000")
 
-echo "Starting QEMU with native kboot (audio: $AUDIO_DRIVER)..."
+# Window or VNC. Without a GUI backend QEMU silently falls back to VNC,
+# so the window is only offered when gtk or sdl is actually installed
+WINDOW_UI=
+displays=$("$QEMU" -display help 2>/dev/null)
+for d in gtk sdl; do
+    if grep -qx "$d" <<<"$displays"; then WINDOW_UI=$d; break; fi
+done
+if [ -z "$VIEW" ]; then
+    if [ -t 0 ]; then
+        echo "How to show KirillOS?"
+        if [ -n "$WINDOW_UI" ]; then
+            echo "  1) Window ($WINDOW_UI)"
+        else
+            echo "  1) Window (not available: install qemu-ui-gtk)"
+        fi
+        echo "  2) VNC (localhost:5900)"
+        read -r -p "Choice [1]: " choice
+        case "$choice" in 2) VIEW=vnc ;; *) VIEW=window ;; esac
+    elif [ -n "$WINDOW_UI" ]; then
+        VIEW=window
+    else
+        VIEW=vnc
+    fi
+fi
+if [ "$VIEW" = window ]; then
+    if [ -z "$WINDOW_UI" ]; then
+        echo "[ERROR] QEMU has no window backend. Install it: sudo pacman -S qemu-ui-gtk  /  sudo apt install qemu-system-gui"
+        echo "        Or run with --vnc"
+        exit 1
+    fi
+    DISPLAY_ARGS=(-display "$WINDOW_UI")
+else
+    DISPLAY_ARGS=(-display vnc=127.0.0.1:0)
+    echo "VNC server: localhost:5900 (e.g. vncviewer localhost:5900)"
+fi
+
+echo "Starting QEMU with native kboot (audio: $AUDIO_DRIVER, display: $VIEW)..."
 echo
-exec "$QEMU" -drive "file=$DISK_IMG,format=raw,if=ide" "${AUDIO_ARGS[@]}" -machine pcspk-audiodev=kirillos_audio -device AC97,audiodev=kirillos_audio -nic user,model=e1000 -m 128M
+exec "$QEMU" -drive "file=$DISK_IMG,format=raw,if=ide" "${AUDIO_ARGS[@]}" -machine pcspk-audiodev=kirillos_audio -device AC97,audiodev=kirillos_audio -nic user,model=e1000 -m 128M "${DISPLAY_ARGS[@]}"

@@ -65,8 +65,8 @@ KirillOS — небольшая учебная 32-битная операцио�
 На Linux `build.sh` берёт всё из `PATH`. Кросс-компилятор не обязателен: если `i686-elf-gcc` не найден, скрипт собирает обычными `gcc` и `ld` с флагами `-m32` и `-m elf_i386`.
 
 ```bash
-sudo pacman -S nasm gcc python qemu-system-x86 qemu-audio-pipewire   # Arch
-sudo apt install nasm gcc python3 qemu-system-x86                    # Debian / Ubuntu
+sudo pacman -S nasm gcc python qemu-system-x86 qemu-audio-pipewire qemu-ui-gtk   # Arch
+sudo apt install nasm gcc python3 qemu-system-x86 qemu-system-gui                # Debian / Ubuntu
 ```
 
 Любой инструмент можно указать явно переменной окружения: `CC`, `LD`, `NASM`, `PYTHON`, `QEMU`, например `CC=i686-elf-gcc LD=i686-elf-ld ./build.sh`.
@@ -83,8 +83,12 @@ build.bat
 
 ```bash
 ./build.sh            # собрать и запустить
+./build.sh --window   # запустить в окне
+./build.sh --vnc      # запустить с VNC-сервером на localhost:5900
 ./build.sh --no-run   # только собрать, без QEMU
 ```
+
+Без `--window` и `--vnc` скрипт спросит, где показать систему: в окне или по VNC. Окно доступно, только если для QEMU установлен графический интерфейс (`qemu-ui-gtk` на Arch, `qemu-system-gui` на Debian / Ubuntu); без него QEMU умеет показывать экран только по VNC. К VNC можно подключиться любым клиентом, например `vncviewer localhost:5900`.
 
 Скрипт:
 1. собирает загрузчик kboot (сектор MBR и вторую стадию);
