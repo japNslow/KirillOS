@@ -226,7 +226,7 @@ static void log_ata_kfs(void) {
 
     log_tag("kfs");
     if (kfs_is_persistent()) {
-        vga_write("sector 321 magic=");
+        vga_write("sector 705 magic=");
         log_hex(0x4B465334, 8);
         vga_write(" ");
         print_number(kfs_file_count());

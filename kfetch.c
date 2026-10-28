@@ -200,7 +200,7 @@ void kfetch_print(void) {
     vga_set_color(VGA_LIGHT_GREY, VGA_BLACK);
     vga_write("ATA PIO 64 MiB (KirillFS: ");
     print_dec(kfs_file_count());
-    vga_write(kfs_is_persistent() ? "/32 files, Disk LBA 321)\n" : "/32 files, RAM)\n");
+    vga_write(kfs_is_persistent() ? "/32 files, Disk LBA 705)\n" : "/32 files, RAM)\n");
 
     /* Line 8: Memory */
     vga_write("                                     ");

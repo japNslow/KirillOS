@@ -16,7 +16,7 @@ _kboot_start:
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    mov esp, 0x70000
+    mov esp, 0x90000    ; выше кэша ядра 0x20000..0x6FFFF, ниже EBDA BIOS
 
     ; Переход в C-код терминала kboot
     call kboot_main

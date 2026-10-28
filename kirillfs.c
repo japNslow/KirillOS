@@ -3,9 +3,9 @@
 #include <stdint.h>
 
 #define KFS_MAGIC            0x4B465334  /* KFS4 */
-#define KFS_FIRST_SECTOR     321         /* Superblock */
-#define KFS_DIR_SECTOR       322         /* Directory Table (512 bytes = 1 sector) */
-#define KFS_DATA_START       323         /* First data sector */
+#define KFS_FIRST_SECTOR     705         /* Superblock, right after the 320 KB kernel area */
+#define KFS_DIR_SECTOR       706         /* Directory Table (512 bytes = 1 sector) */
+#define KFS_DATA_START       707         /* First data sector */
 #define KFS_SECTORS_PER_FILE ((KFS_DATA_MAX + 511) / 512) /* 96 sectors for 48KB */
 
 typedef struct {

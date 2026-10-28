@@ -12,6 +12,27 @@ SECTOR_SIZE = 512
 MBR_OFFSET = 0
 KBOOT_OFFSET = 1 * SECTOR_SIZE       # LBA 1
 KERNEL_OFFSET = 65 * SECTOR_SIZE     # LBA 65
+KERNEL_SECTORS = 640                 # LBA 65..704 = 320 КБ
+
+KFS_MAGIC = 0x4B465334               # "KFS4"
+KFS_OLD_LBA = 321                    # KirillFS до расширения области ядра
+KFS_LBA = 65 + KERNEL_SECTORS        # LBA 705
+KFS_SECTORS = 2 + 16 * 96            # суперблок, каталог и 16 слотов по 48 КБ
+
+def has_kfs(img, lba):
+    img.seek(lba * SECTOR_SIZE)
+    return int.from_bytes(img.read(4), "little") == KFS_MAGIC
+
+def migrate_kfs(img):
+    # Образы, собранные до расширения ядра, хранят файлы с LBA 321, а теперь там
+    # лежит ядро. Переносим KirillFS на новое место, пока ядро её не затёрло.
+    if not has_kfs(img, KFS_OLD_LBA) or has_kfs(img, KFS_LBA):
+        return
+    img.seek(KFS_OLD_LBA * SECTOR_SIZE)
+    data = img.read(KFS_SECTORS * SECTOR_SIZE)  # области пересекаются: сначала читаем целиком
+    img.seek(KFS_LBA * SECTOR_SIZE)
+    img.write(data)
+    print(f"[OK] Moved KirillFS from LBA {KFS_OLD_LBA} to LBA {KFS_LBA}")
 
 def main():
     # Создаём 64 МБ образ, если его ещё нет
@@ -21,6 +42,8 @@ def main():
             f.truncate(IMG_SIZE)
 
     with open(IMG_FILE, "r+b") as img:
+        migrate_kfs(img)
+
         # 1. Запись MBR
         with open(MBR_FILE, "rb") as f:
             mbr_data = f.read()
@@ -49,7 +72,7 @@ def main():
         # 3. Запись ядра (kernel.bin)
         with open(KERNEL_FILE, "rb") as f:
             kernel_data = f.read()
-            max_kernel = (321 - 65) * SECTOR_SIZE  # 256 секторов = 131072 байта (128 КБ)
+            max_kernel = KERNEL_SECTORS * SECTOR_SIZE  # 640 секторов = 327680 байт (320 КБ)
             if len(kernel_data) > max_kernel:
                 print(f"[ERROR] kernel.bin is {len(kernel_data)} bytes, exceeds {max_kernel} limit!")
                 sys.exit(1)
@@ -58,7 +81,7 @@ def main():
             pad_kernel = max_kernel - len(kernel_data)
             if pad_kernel > 0:
                 img.write(b"\x00" * pad_kernel)
-            print(f"[OK] Wrote kernel ({len(kernel_data)} bytes) to LBA 65..320")
+            print(f"[OK] Wrote kernel ({len(kernel_data)} bytes) to LBA 65..{65 + KERNEL_SECTORS - 1}")
 
 
     print("[SUCCESS] Disk image 'kirillos.img' assembled.")
