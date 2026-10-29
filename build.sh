@@ -97,6 +97,7 @@ echo "[1/5] Building kboot bootloader (MBR + Stage 2)..."
 
 echo "[2/5] Assembling kernel boot.asm..."
 "$NASM" -f elf32 boot.asm -o boot.o || fail
+"$NASM" -f elf32 kpanic_isr.asm -o kpanic_isr.o || fail
 
 echo "[2.5/5] Building KHEX applications (.bin)..."
 for app in guess matrix snake; do
@@ -106,7 +107,7 @@ done
 "$PYTHON" -c "for n in ['guess','matrix','snake']: data=open(f'apps/{n}.bin','rb').read(); open(f'apps/{n}_data.h','w').write(f'static const uint8_t {n.upper()}_BIN[{len(data)}] = {{\n' + ', '.join(f'0x{b:02X}' for b in data) + '\n};\n')" || fail
 
 echo "[3/5] Compiling KirillOS kernel C files..."
-for src in kernel vga keyboard kirillfs kmemory ata sound ac97 kano kdhe kmidi khex khexd kfetch mode13 mouse; do
+for src in kernel kpanic vga keyboard kirillfs kmemory ata sound ac97 kano kdhe kmidi khex khexd kfetch mode13 mouse; do
     "$CC" "${CFLAGS[@]}" -c "$src.c" -o "$src.o" -Wall -Wextra -O2 || fail
 done
 for src in kcommander kaint kguiq kguid kgui e1000 net; do
@@ -115,7 +116,7 @@ done
 
 echo "[4/5] Linking KirillOS kernel..."
 # -s drops symbol tables: kboot only needs program headers, and the kernel must fit in 128 KB
-"$LD" "${LDFLAGS[@]}" -s -T linker.ld -o "$OUT" boot.o kernel.o keyboard.o vga.o kirillfs.o kmemory.o ata.o sound.o ac97.o kano.o kdhe.o kmidi.o khex.o khexd.o kfetch.o mode13.o mouse.o kcommander.o kaint.o kguiq.o kguid.o kgui.o e1000.o net.o || fail
+"$LD" "${LDFLAGS[@]}" -s -T linker.ld -o "$OUT" boot.o kpanic_isr.o kernel.o kpanic.o keyboard.o vga.o kirillfs.o kmemory.o ata.o sound.o ac97.o kano.o kdhe.o kmidi.o khex.o khexd.o kfetch.o mode13.o mouse.o kcommander.o kaint.o kguiq.o kguid.o kgui.o e1000.o net.o || fail
 
 echo "[5/5] Assembling bootable disk image $DISK_IMG..."
 "$PYTHON" create_image.py || fail

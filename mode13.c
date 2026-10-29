@@ -56,6 +56,7 @@ static const uint8_t mode03_ac[21] = {
 /* Plane 2 Font Backup (8192 bytes for 256 characters of 32 bytes each) */
 static uint8_t font_backup[8192];
 static int     font_saved = 0;
+static int     graphics_active = 0;  /* 1 while the VGA is in Mode 13h */
 
 static void save_font(void) {
     if (font_saved) return; /* Never overwrite font once saved from clean text mode */
@@ -200,9 +201,15 @@ void mode13_enter(void) {
 
     init_default_palette();
     mode13_clear(0);
+    graphics_active = 1;
+}
+
+int mode13_is_active(void) {
+    return graphics_active;
 }
 
 void mode13_exit(void) {
+    graphics_active = 0;
     outb(0x3C4, 0x00); outb(0x3C5, 0x01);
     outb(0x3C2, mode03_misc);
 

@@ -65,6 +65,8 @@ if errorlevel 1 goto :error
 echo [2/5] Assembling kernel boot.asm...
 %NASM% -f elf32 boot.asm -o boot.o
 if errorlevel 1 goto :error
+%NASM% -f elf32 kpanic_isr.asm -o kpanic_isr.o
+if errorlevel 1 goto :error
 
 echo [2.5/5] Building KHEX applications (.bin)...
 "%GCC%" -m32 -c apps\guess.c  -o apps\guess.o  -ffreestanding -fno-pie -fno-stack-protector -Os
@@ -77,6 +79,8 @@ echo [2.5/5] Building KHEX applications (.bin)...
 
 echo [3/5] Compiling KirillOS kernel C files...
 "%GCC%" -m32 -c kernel.c   -o kernel.o   -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -O2
+if errorlevel 1 goto :error
+"%GCC%" -m32 -c kpanic.c   -o kpanic.o   -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -O2
 if errorlevel 1 goto :error
 "%GCC%" -m32 -c vga.c      -o vga.o      -ffreestanding -fno-pie -fno-stack-protector -Wall -Wextra -O2
 if errorlevel 1 goto :error
@@ -125,7 +129,7 @@ if errorlevel 1 goto :error
 
 echo [4/5] Linking KirillOS kernel...
 REM -s drops symbol tables: kboot only needs program headers, and the kernel must fit in 128 KB
-"%LD%" -m elf_i386 -s -T linker.ld -o %OUT% boot.o kernel.o keyboard.o vga.o kirillfs.o kmemory.o ata.o sound.o ac97.o kano.o kdhe.o kmidi.o khex.o khexd.o kfetch.o mode13.o mouse.o kcommander.o kaint.o kguiq.o kguid.o kgui.o e1000.o net.o
+"%LD%" -m elf_i386 -s -T linker.ld -o %OUT% boot.o kpanic_isr.o kernel.o kpanic.o keyboard.o vga.o kirillfs.o kmemory.o ata.o sound.o ac97.o kano.o kdhe.o kmidi.o khex.o khexd.o kfetch.o mode13.o mouse.o kcommander.o kaint.o kguiq.o kguid.o kgui.o e1000.o net.o
 
 if errorlevel 1 goto :error
 

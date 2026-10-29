@@ -11,6 +11,7 @@
 void mode13_init(void);
 void mode13_enter(void);
 void mode13_exit(void);
+int  mode13_is_active(void);   /* 1 while in 320x200 graphics */
 
 void mode13_clear(uint8_t color);
 void mode13_put_pixel(int x, int y, uint8_t color);

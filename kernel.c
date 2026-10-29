@@ -17,6 +17,7 @@
 #include "kgui.h"
 #include "e1000.h"
 #include "net.h"
+#include "kpanic.h"
 
 void kernel_execute_command(char* cmd);
 
@@ -137,6 +138,12 @@ static void boot_verbose(uint32_t magic, uint32_t mbi) {
     vga_write("text 80x25 framebuf=");
     log_hex(0xB8000, 8);
     vga_write(" 16-color");
+    vga_newline();
+
+    /* ---- idt ---- */
+    log_tag("idt");
+    vga_write("256 gates, CPU exceptions -> Kirill Panic");
+    log_ok();
     vga_newline();
 }
 
@@ -447,6 +454,7 @@ static void handle_command(char* cmd) {
         vga_write("  ping H [N]   - ICMP echo to host or IP (default 4 times)\n");
         vga_write("  tcping H [P] [N] - TCP connect probe, real RTT (default port 80)\n");
         vga_write("  host NAME    - resolve a name via DNS\n");
+        vga_write("  panic [div|ud|gp|int3] - test the Kirill Panic screen\n");
     }
     else if (strcmp_(cmd, "about") == 0) {
         vga_write("KirillOS v0.2 - minimal x86 OS\n");
@@ -526,6 +534,10 @@ static void handle_command(char* cmd) {
         char* name = next_word(cmd + (command_is(cmd, "host") ? 4 : 8));
         if (!name) vga_write("Usage: host NAME\n");
         else net_host(name);
+    }
+    else if (command_is(cmd, "panic")) {
+        char* kind = next_word(cmd + 5);
+        kpanic_test(kind ? kind : "");
     }
     else if (command_is(cmd, "run")) {
 
@@ -722,6 +734,7 @@ void kernel_execute_command(char* cmd) {
 /*                      Kernel entry point                          */
 /* ================================================================ */
 void kernel_main(uint32_t magic, uint32_t mbi) {
+    kpanic_init();   /* first: any CPU exception from here on shows the Kirill Panic screen */
     vga_init();
 
     /* Sync VGA cursor with boot.asm position so log continues seamlessly */

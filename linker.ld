@@ -6,8 +6,10 @@ SECTIONS
 
     .text BLOCK(4K) : ALIGN(4K)
     {
+        kernel_text_start = .;
         *(.multiboot)
-        *(.text)
+        *(.text .text.*)
+        kernel_text_end = .;
     }
 
     .rodata BLOCK(4K) : ALIGN(4K)
