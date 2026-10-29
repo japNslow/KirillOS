@@ -80,8 +80,11 @@ static void get_rtc_time(int* hour, int* min, int* sec) {
         m = bcd_to_bin(m);
         h = (uint8_t)(bcd_to_bin(h & 0x7F) | (h & 0x80));
     }
-    if (!(reg_b & 0x02) && (h & 0x80)) {
-        h = ((h & 0x7F) + 12) % 24;
+    if (!(reg_b & 0x02)) {                /* 12-hour mode: 12 AM -> 0, 1..11 PM -> 13..23 */
+        int pm = h & 0x80;
+        h &= 0x7F;
+        if (h == 12) h = 0;
+        if (pm) h += 12;
     }
     *hour = (int)h;
     *min  = (int)m;
@@ -145,10 +148,17 @@ void kguid_draw_desktop(void) {
                 int32_t bmp_h = (int32_t)((uint32_t)p[22] | ((uint32_t)p[23] << 8) |
                                           ((uint32_t)p[24] << 16) | ((uint32_t)p[25] << 24));
                 uint16_t bpp = (uint16_t)p[28] | ((uint16_t)p[29] << 8);
+                uint32_t compression = (uint32_t)p[30] | ((uint32_t)p[31] << 8) |
+                                       ((uint32_t)p[32] << 16) | ((uint32_t)p[33] << 24);
 
-                if (bpp == 8 && bmp_w > 0 && bmp_h != 0) {
-                    int bottom_up = 1;
-                    if (bmp_h < 0) { bmp_h = -bmp_h; bottom_up = 0; }
+                int bottom_up = 1;
+                if (bmp_h < 0) { bmp_h = -bmp_h; bottom_up = 0; }
+                /* Uncompressed 8-bit only, and every pixel row must lie inside the file */
+                int valid = bpp == 8 && compression == 0 && bmp_w > 0 && bmp_w <= 4096 &&
+                            bmp_h > 0 && bmp_h <= 4096 && off_bits <= (uint32_t)file_size &&
+                            (uint32_t)((bmp_w + 3) & ~3) * (uint32_t)bmp_h <= (uint32_t)file_size - off_bits;
+
+                if (valid) {
 
                     int draw_w = bmp_w > MODE13_WIDTH ? MODE13_WIDTH : bmp_w;
                     int draw_h = bmp_h > KGUID_DESKTOP_H ? KGUID_DESKTOP_H : bmp_h;
@@ -348,10 +358,13 @@ void kguid_close_window(int id) {
         zorder_count--;
     }
 
-    /* Focus new top window */
-    if (zorder_count > 0) {
-        int top_slot = zorder[zorder_count - 1];
-        kguid_focus_window(windows[top_slot].id);
+    /* Focus the topmost visible window; minimized ones stay minimized */
+    for (int i = zorder_count - 1; i >= 0; i--) {
+        int s = zorder[i];
+        if (windows[s].used && !windows[s].minimized) {
+            kguid_focus_window(windows[s].id);
+            break;
+        }
     }
 }
 
@@ -383,27 +396,24 @@ int kguid_find_window_at(int px, int py) {
 
 int kguid_find_titlebar_at(int px, int py, int* out_btn) {
     if (out_btn) *out_btn = 0;
-    for (int i = zorder_count - 1; i >= 0; i--) {
-        int s = zorder[i];
-        if (windows[s].used && !windows[s].minimized) {
-            if (kguiq_point_in_rect(px, py, windows[s].x, windows[s].y, windows[s].w, 16)) {
-                int btn_size = 10;
-                int btn_y = windows[s].y + 4;
-                int close_x = windows[s].x + windows[s].w - btn_size - 4;
-                int max_x   = close_x - btn_size - 2;
-                int min_x   = max_x - btn_size - 2;
+    /* Only the topmost window under the point counts: a covered titlebar is not clickable */
+    int id = kguid_find_window_at(px, py);
+    kgui_window_t* w = kguid_get_window(id);
+    if (!w || !kguiq_point_in_rect(px, py, w->x, w->y, w->w, 16)) return -1;
 
-                if (out_btn) {
-                    if (kguiq_point_in_rect(px, py, close_x, btn_y, btn_size, btn_size)) *out_btn = 3; /* Close */
-                    else if (kguiq_point_in_rect(px, py, max_x, btn_y, btn_size, btn_size)) *out_btn = 2; /* Max */
-                    else if (kguiq_point_in_rect(px, py, min_x, btn_y, btn_size, btn_size)) *out_btn = 1; /* Min */
-                    else *out_btn = 0; /* Titlebar drag */
-                }
-                return windows[s].id;
-            }
-        }
+    int btn_size = 10;
+    int btn_y = w->y + 4;
+    int close_x = w->x + w->w - btn_size - 4;
+    int max_x   = close_x - btn_size - 2;
+    int min_x   = max_x - btn_size - 2;
+
+    if (out_btn) {
+        if (kguiq_point_in_rect(px, py, close_x, btn_y, btn_size, btn_size)) *out_btn = 3; /* Close */
+        else if (kguiq_point_in_rect(px, py, max_x, btn_y, btn_size, btn_size)) *out_btn = 2; /* Max */
+        else if (kguiq_point_in_rect(px, py, min_x, btn_y, btn_size, btn_size)) *out_btn = 1; /* Min */
+        else *out_btn = 0; /* Titlebar drag */
     }
-    return -1;
+    return id;
 }
 
 int kguid_get_zorder_count(void) { return zorder_count; }
@@ -419,6 +429,15 @@ int kguid_get_zorder_window(int z_index) {
 /* ================================================================ */
 /*                       Taskbar & Start Menu API                   */
 /* ================================================================ */
+/* Taskbar buttons shrink so every open window keeps a button (area x = 58..244) */
+static int taskbar_button_width(void) {
+    int count = 0;
+    for (int i = 0; i < KGUID_MAX_WINDOWS; i++) if (windows[i].used) count++;
+    if (count == 0) return 54;
+    int w = (244 - 58) / count - 2;
+    return w > 54 ? 54 : w;
+}
+
 void kguid_draw_taskbar(int start_pressed, int focused_win_id) {
     /* 1. Base Taskbar Surface */
     kguiq_draw_rect_fill(0, KGUID_TASKBAR_Y, MODE13_WIDTH, KGUID_TASKBAR_H, KGUI_3D_FACE);
@@ -436,16 +455,16 @@ void kguid_draw_taskbar(int start_pressed, int focused_win_id) {
 
     /* 3. Open Windows on Taskbar */
     int cur_bx = 58;
+    int btn_w = taskbar_button_width();
     for (int i = 0; i < KGUID_MAX_WINDOWS; i++) {
         if (!windows[i].used) continue;
-        int btn_w = 54;
-        if (cur_bx + btn_w > 244) break; /* Avoid tray overlap */
         int is_active = (windows[i].id == focused_win_id && !windows[i].minimized);
 
         kguiq_draw_rect_fill(cur_bx, sb_y, btn_w, sb_h, KGUI_3D_FACE);
         kguiq_draw_bevel(cur_bx, sb_y, btn_w, sb_h, is_active);
         kguiq_draw_icon(cur_bx + 2, sb_y + 1, windows[i].icon);
-        kguiq_draw_string_clipped(cur_bx + 14, sb_y + 2, windows[i].title, KGUI_COLOR_BLACK, cur_bx + btn_w - 2);
+        if (btn_w >= 22)
+            kguiq_draw_string_clipped(cur_bx + 14, sb_y + 2, windows[i].title, KGUI_COLOR_BLACK, cur_bx + btn_w - 2);
 
         cur_bx += (btn_w + 2);
     }
@@ -478,10 +497,9 @@ void kguid_draw_taskbar(int start_pressed, int focused_win_id) {
 int kguid_find_taskbar_window_at(int px, int py) {
     if (py < KGUID_TASKBAR_Y + 2 || py >= KGUID_TASKBAR_Y + 14) return -1;
     int cur_bx = 58;
+    int btn_w = taskbar_button_width();
     for (int i = 0; i < KGUID_MAX_WINDOWS; i++) {
         if (!windows[i].used) continue;
-        int btn_w = 54;
-        if (cur_bx + btn_w > 244) break;
         if (px >= cur_bx && px < cur_bx + btn_w) {
             return windows[i].id;
         }
@@ -502,7 +520,7 @@ int kguid_start_menu_item_at(int px, int py) {
     int sm_y = 86;
     int sm_w = 114;
     int sm_h = 96;
-    if (!kguiq_point_in_rect(px, py, sm_x, sm_y, sm_w, sm_h)) return -1;
+    if (!kguiq_point_in_rect(px, py, sm_x, sm_y + 3, sm_w, sm_h - 3)) return -1;
 
     int item_idx = (py - (sm_y + 3)) / 11;
     if (item_idx >= 0 && item_idx < START_MENU_ITEMS) return item_idx;
